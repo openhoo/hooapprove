@@ -7,6 +7,21 @@ Ein MCP-Server kann einen Einkauf vorbereiten und eine Anfrage auf das Handy sch
 Erst nach der menschlichen Entscheidung darf der vertrauenswürdige Server die konkrete Aktion
 einmal einlösen und ausführen.
 
+## Veröffentlichung
+
+Quellcode: `openhoo/hooapprove`. Die Preview-Releases enthalten ein Android-Demo-APK,
+den Helm-Chart, Prüfsummen und den unveränderlichen Container-Digest. Das Android-Paket
+ist ARM64 und debug-signiert; es verwendet die lokale Demo-API auf Loopback.
+Für einen verbundenen Emulator oder ein Android-Handy nach Start des Demo-Dienstes:
+
+```sh
+adb reverse tcp:8097 tcp:8097
+adb install hooapprove-demo-android-arm64.apk
+```
+
+Die veröffentlichte Preview belegt keinen produktiven OpenHoo-Rollout,
+keine App-Store-Freigabe und keine echte REWE-Bestellung.
+
 ## Enthalten
 
 - Native App mit offenen Anfragen, vollständigen Aktionsdetails, Schieben zum Freigeben,
