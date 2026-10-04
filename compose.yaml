@@ -1,0 +1,19 @@
+services:
+  hooapprove:
+    build: .
+    ports: ["127.0.0.1:8097:8097"]
+    environment:
+      HOOAPPROVE_PUBLIC_URL: ${HOOAPPROVE_PUBLIC_URL:?Set the HTTPS URL of your reverse proxy}
+      HOOAPPROVE_SECRETS_FILE: /run/secrets/config
+    secrets: [config]
+    volumes: ["hooapprove-data:/data"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    restart: unless-stopped
+secrets:
+  config:
+    file: ${HOOAPPROVE_SECRETS_FILE:?Set the path to your protected configuration}
+volumes:
+  hooapprove-data:

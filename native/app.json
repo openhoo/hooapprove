@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "HooApprove",
+    "slug": "hooapprove",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "ai.openhoo.hooapprove",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "ai.openhoo.hooapprove",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#183C30"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "HooApprove nutzt Face ID, um deine Freigaben zu best\u00e4tigen."
+        }
+      ],
+      "expo-router",
+      "expo-build-properties"
+    ],
+    "scheme": "hooapprove",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F5EE"
+    }
+  }
+}

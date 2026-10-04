@@ -1,0 +1,5 @@
+# Local Android preview build: no EAS account or production signing credential needed.
+FROM node:24-bookworm-slim AS node
+FROM ghcr.io/cirruslabs/android-sdk:36@sha256:f9b3ea9ed2b5fc9522adae82c7b4622ab7aa54207ef532c8e615a347dca08f31
+COPY --from=node /usr/local /usr/local
+WORKDIR /build

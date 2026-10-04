@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hooapprove-data
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ .Values.storageClassName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.storage | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hooapprove
+spec:
+  # SQLite transactions fence claims. One replica, one durable volume, Recreate upgrades.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: hooapprove}
+  template:
+    metadata:
+      labels: {app: hooapprove}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecret | quote }}
+      containers:
+      - name: app
+        image: {{ required "Publish the image and set an immutable digest in values.image" .Values.image | quote }}
+        ports:
+        - {name: http, containerPort: 8097}
+        env:
+        - {name: HOOAPPROVE_DATABASE, value: /data/hooapprove.db}
+        - {name: HOOAPPROVE_SECRETS_FILE, value: /run/hooapprove/config.json}
+        - name: HOOAPPROVE_PUBLIC_URL
+          value: {{ .Values.publicUrl | quote }}
+        - name: HOOAPPROVE_ISSUER
+          value: {{ .Values.issuer | quote }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        resources:
+          requests: {cpu: 100m, memory: 128Mi}
+          limits: {cpu: '1', memory: 512Mi}
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+            httpHeaders:
+            - {name: Host, value: {{ .Values.host | quote }}}
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+            httpHeaders:
+            - {name: Host, value: {{ .Values.host | quote }}}
+          initialDelaySeconds: 15
+        volumeMounts:
+        - {name: data, mountPath: /data}
+        - {name: config, mountPath: /run/hooapprove, readOnly: true}
+        - {name: tmp, mountPath: /tmp}
+      volumes:
+      - name: data
+        persistentVolumeClaim: {claimName: hooapprove-data}
+      - name: config
+        secret:
+          secretName: {{ .Values.secretName | quote }}
+          defaultMode: 0440
+      - name: tmp
+        emptyDir: {medium: Memory, sizeLimit: 16Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hooapprove
+spec:
+  selector: {app: hooapprove}
+  ports:
+  - {name: http, port: 80, targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hooapprove
+spec:
+  ingressClassName: {{ .Values.ingressClassName | quote }}
+  tls:
+  - hosts: [{{ .Values.host | quote }}]
+    secretName: {{ .Values.tlsSecretName | quote }}
+  rules:
+  - host: {{ .Values.host | quote }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hooapprove
+            port: {name: http}

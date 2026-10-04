@@ -1,0 +1,9 @@
+.git
+.venv
+native
+data
+output
+tests
+*.db*
+.env*
+secrets*.json

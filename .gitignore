@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.db*
+.env
+secrets*.json
+node_modules/
+output/
+dist/
+data/
+
+native/.claude/

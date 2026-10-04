@@ -1,0 +1,8 @@
+node_modules
+.expo
+dist
+android/.gradle
+android/app/build
+.env*
+*.p12
+*.mobileprovision

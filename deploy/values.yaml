@@ -1,0 +1,11 @@
+# Set an immutable published digest before deploying through hooapps-gitops.
+image: ""
+publicUrl: https://approve.openhoo.dev
+issuer: https://auth.openhoo.ai
+secretName: hooapprove
+storageClassName: local-path-retain
+storage: 2Gi
+ingressClassName: traefik
+host: approve.openhoo.dev
+tlsSecretName: hooapprove-tls
+imagePullSecret: ghcr
