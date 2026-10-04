@@ -26,6 +26,15 @@ Die frühere Veröffentlichung ist in `verification-login-preview.md` als histor
 - Ein emulatorseitiger Touch-Klick funktioniert; Drag-Ereignisse ließen sich über den verwendeten macOS-Mirror nicht zuverlässig übertragen. Der native Schieberegler ist daher noch nicht durch eine echte Hardware-Touchgeste abgenommen. Die signierte Ablehnung und Bestätigungsdialoge bleiben benutzbar; kein synthetischer Serverentscheid wurde als App-Freigabe ausgegeben.
 - Screenshots: `output/native-no-login.png`, `output/native-pairing-preview.png`, `output/native-rejected-action.png`.
 
+## Reduzierte Oberfläche · Preview 4
+
+- Veröffentlicht: [v0.1.0-preview.4](https://github.com/openhoo/hooapprove/releases/tag/v0.1.0-preview.4), UI-PR #8, Quellrevision `4e7540b7a8e0b385d3e04e94930da873b9083bdf`.
+- Dienst-, Native- und CodeQL-Checks erfolgreich; Release-Workflow `37227258560` erfolgreich.
+- Veröffentlichte ARM64-APK heruntergeladen: alle `SHA256SUMS` geprüft und `SOURCE.txt` mit dem getesteten Commit abgeglichen. APK SHA-256: `167cf193dc33e1273fcfbd10a098511e08307195eeb7188b91e9cd52b478b871`.
+- APK-Signatur gültig; Zertifikat stimmt mit Preview 3 überein. Installation mit `adb install -r` erfolgreich, ohne Deinstallation. Start der tatsächlichen Release-APK auf Android-15-ARM64-Emulator visuell geprüft: reduzierte Startansicht, kein Login. Screenshot: `output/release-preview4/start.png`.
+- Kopplungsansicht und Anfragekarte vorher in einer separaten Designvorschau geprüft; die Anfragekarte verwendete lokale Beispieldaten. Die Design-Fixture ist nicht Bestandteil des Release-Quellstands.
+- Diese UI-Veröffentlichung führt keine neue Produktionskopplung oder REWE-Bestellung aus. Die Backend-Abnahme oben bleibt der Nachweis für den unveränderten Dienst.
+
 ## Offene Grenzen
 
 - Reale Push-Zustellung benötigt ein Push-Projekt und APNs/FCM-Einrichtung; Vordergrund-Polling funktioniert unabhängig davon.
