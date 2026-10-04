@@ -9,18 +9,25 @@ einmal einlösen und ausführen.
 
 ## Veröffentlichung
 
-Quellcode: `openhoo/hooapprove`. Die Preview-Releases enthalten ein Android-Demo-APK,
-den Helm-Chart, Prüfsummen und den unveränderlichen Container-Digest. Das Android-Paket
-ist ARM64 und debug-signiert; es verwendet die lokale Demo-API auf Loopback.
-Für einen verbundenen Emulator oder ein Android-Handy nach Start des Demo-Dienstes:
+[Android-Vorschau herunterladen](https://github.com/openhoo/hooapprove/releases/latest) ·
+[Alle Preview-Releases](https://github.com/openhoo/hooapprove/releases) ·
+[Gehosteter Dienst](https://approve.openhoo.dev)
+
+
+Quellcode: `openhoo/hooapprove`. Die Preview-Releases enthalten ein Android-APK,
+den Helm-Chart, Prüfsummen und den unveränderlichen Container-Digest. Die Android-Pakete
+sind ARM64 und debug-signiert. Preview 1 ist eine lokale Demo; ab Preview 2 verwendet
+die App den gehosteten HTTPS-Dienst. Beide enthalten das App-Bundle und benötigen
+keinen Metro-Server. Nur für die lokale Demo nach Start des Demo-Dienstes:
 
 ```sh
 adb reverse tcp:8097 tcp:8097
 adb install hooapprove-demo-android-arm64.apk
 ```
 
-Die veröffentlichte Preview belegt keinen produktiven OpenHoo-Rollout,
-keine App-Store-Freigabe und keine echte REWE-Bestellung.
+Der veröffentlichte Quellcode und die APKs belegen keine App-Store-Freigabe
+und keine echte REWE-Bestellung. Der tatsächliche Dienst-Rollout wird separat
+in `docs/verification.md` dokumentiert. Push benötigt noch die EAS/APNs/FCM-Einrichtung.
 
 ## Enthalten
 
