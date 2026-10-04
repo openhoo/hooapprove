@@ -44,8 +44,6 @@ spec:
         - {name: HOOAPPROVE_SECRETS_FILE, value: /run/hooapprove/config.json}
         - name: HOOAPPROVE_PUBLIC_URL
           value: {{ .Values.publicUrl | quote }}
-        - name: HOOAPPROVE_ISSUER
-          value: {{ .Values.issuer | quote }}
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

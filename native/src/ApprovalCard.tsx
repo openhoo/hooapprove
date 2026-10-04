@@ -30,7 +30,7 @@ function Slide({ disabled, onApprove }: { disabled: boolean; onApprove: () => vo
     <Animated.View {...responder.panHandlers} style={[s.thumb, { transform: [{ translateX: position }] }]}><Text style={s.thumbText}>→</Text></Animated.View>
   </View>;
 }
-export function ApprovalCard({ item, busy, decide }: { item: Approval; busy: boolean; decide: (item: Approval, decision: 'approve' | 'reject') => void }) {
+export function ApprovalCard({ item, busy, decide }: { item: Approval & { deviceId?: string }; busy: boolean; decide: (item: Approval, decision: 'approve' | 'reject') => void }) {
   const [events, setEvents] = useState<Event[] | null>(null);
   const pending = item.status === 'pending';
   const [now, setNow] = useState(() => Date.now());
@@ -44,7 +44,7 @@ export function ApprovalCard({ item, busy, decide }: { item: Approval; busy: boo
     {pending ? <><Slide disabled={busy} onApprove={() => decide(item, 'approve')} /><Text style={s.hint}>Nur die oben gezeigte Aktion wird freigegeben.</Text>
       <Pressable disabled={busy} accessibilityRole="button" onPress={() => decide(item, 'reject')} style={s.reject}><Text style={s.rejectText}>Anfrage ablehnen</Text></Pressable></>
       : <Pressable accessibilityRole="button" style={s.eventButton} onPress={async () => {
-        try { setEvents(await api(`/api/requests/${item.id}/events`)); } catch { Alert.alert('Verlauf nicht verfügbar', 'Bitte versuche es erneut.'); }
+        try { setEvents(await api(`/api/requests/${item.id}/events`, undefined, 'GET', item.deviceId)); } catch { Alert.alert('Verlauf nicht verfügbar', 'Bitte versuche es erneut.'); }
       }}><Text style={s.meta}>{events ? 'Entscheidungsverlauf' : 'Entscheidungsverlauf anzeigen ↓'}</Text>
         {events?.map((event, i) => <Text key={i} style={s.event}>{new Date(event.occurred * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · {eventLabels[event.event] || event.event}</Text>)}</Pressable>}
   </View>;

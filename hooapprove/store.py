@@ -17,6 +17,10 @@ class Store:
         with self.connection() as db:
             db.executescript("""
                 PRAGMA journal_mode=WAL;
+                DROP TABLE IF EXISTS mobile_sessions;
+                DROP TABLE IF EXISTS mobile_tickets;
+                DROP TABLE IF EXISTS native_devices;
+                DROP TABLE IF EXISTS subscriptions;
                 CREATE TABLE IF NOT EXISTS requests (
                     id TEXT PRIMARY KEY, service TEXT NOT NULL, subject TEXT NOT NULL,
                     idem TEXT NOT NULL, digest TEXT NOT NULL, envelope TEXT NOT NULL,
@@ -30,19 +34,20 @@ class Store:
                     request_id TEXT NOT NULL, actor TEXT NOT NULL,
                     event TEXT NOT NULL, occurred REAL NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS subscriptions (
-                    subject TEXT NOT NULL, endpoint TEXT PRIMARY KEY, value TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS pairings (
+                    hash TEXT PRIMARY KEY, service TEXT NOT NULL, subject TEXT NOT NULL,
+                    label TEXT NOT NULL, expires REAL NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS mobile_tickets (
-                    hash TEXT PRIMARY KEY, subject TEXT NOT NULL, name TEXT NOT NULL,
-                    challenge TEXT NOT NULL, expires REAL NOT NULL
+                CREATE TABLE IF NOT EXISTS paired_devices (
+                    id TEXT PRIMARY KEY, service TEXT NOT NULL, subject TEXT NOT NULL,
+                    label TEXT NOT NULL, public_key TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,
+                    push_token TEXT, created REAL NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS mobile_sessions (
-                    hash TEXT PRIMARY KEY, subject TEXT NOT NULL, name TEXT NOT NULL,
-                    expires REAL NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS native_devices (
-                    token TEXT PRIMARY KEY, subject TEXT NOT NULL
+                CREATE UNIQUE INDEX IF NOT EXISTS paired_recipient
+                    ON paired_devices(service,subject) WHERE revoked=0;
+                CREATE TABLE IF NOT EXISTS device_nonces (
+                    device_id TEXT NOT NULL, nonce TEXT NOT NULL, expires REAL NOT NULL,
+                    PRIMARY KEY(device_id,nonce)
                 );
             """)
 
@@ -140,12 +145,14 @@ class Store:
             raise HTTPException(404, "Request not found")
         return row
 
-    def list_for(self, subject):
+    def list_for(self, subject, service, device_id):
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             self.expire(db)
+            self.active_device(db, device_id)
             rows = db.execute(
-                "SELECT * FROM requests WHERE subject=? ORDER BY created DESC LIMIT 100", (subject,)
+                "SELECT * FROM requests WHERE subject=? AND service=? ORDER BY created DESC LIMIT 100",
+                (subject, service),
             ).fetchall()
             return [self.public(row) for row in rows]
 
@@ -155,11 +162,14 @@ class Store:
             self.expire(db)
             return self.public(self.owned(db, rid, "service", service))
 
-    def decide(self, rid, subject, decision):
+    def decide(self, rid, subject, decision, service, device_id):
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
+            self.active_device(db, device_id)
             # Expiry is checked inside the transaction, even if nobody has polled.
             row = self.owned(db, rid, "subject", subject)
+            if row["service"] != service:
+                raise HTTPException(404, "Request not found")
             if row["digest"] != decision.digest:
                 raise HTTPException(409, "Action changed; reload before deciding")
             if row["status"] != "pending" or row["expires"] <= time.time():
@@ -214,12 +224,22 @@ class Store:
             self.event(db, rid, service, "cancelled")
             return self.public(self.owned(db, rid, "service", service))
 
-    def events(self, rid, subject):
+    def events(self, rid, subject, service, device_id):
         with self.connection() as db:
-            self.owned(db, rid, "subject", subject)
+            self.active_device(db, device_id)
+            if self.owned(db, rid, "subject", subject)["service"] != service:
+                raise HTTPException(404, "Request not found")
             return [
                 dict(row)
                 for row in db.execute(
                     "SELECT event,occurred FROM events WHERE request_id=? ORDER BY sequence", (rid,)
                 )
             ]
+
+    def active_device(self, db, device_id):
+        row = db.execute(
+            "SELECT * FROM paired_devices WHERE id=? AND revoked=0", (device_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(401, "Device is not paired")
+        return row

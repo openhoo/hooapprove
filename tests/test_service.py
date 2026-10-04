@@ -1,10 +1,8 @@
-import base64
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from hooapprove.app import challenge_for, create_app
+from hooapprove.app import create_app
 from hooapprove.config import Settings
 from hooapprove.models import ActionRequest, action_digest
 
@@ -171,26 +169,6 @@ def test_decision_cannot_be_changed(client, decision):
         assert claim(client, value).status_code == 409
 
 
-def test_csrf_and_origin_required(client):
-    value = create(client)
-    assert (
-        client.post(
-            f"/api/requests/{value['id']}/decision",
-            json={"decision": "approve", "digest": value["digest"]},
-            headers={"Origin": "https://evil.example"},
-        ).status_code
-        == 403
-    )
-    assert (
-        client.post(
-            f"/api/requests/{value['id']}/decision",
-            json={"decision": "approve", "digest": value["digest"]},
-            headers={"X-CSRF-Token": ""},
-        ).status_code
-        == 403
-    )
-
-
 def test_wrong_digest_cannot_approve(client):
     value = create(client)
     assert (
@@ -253,67 +231,6 @@ def test_result_requires_claim_and_correct_execution_id(client):
         ).status_code
         == 409
     )
-
-
-def test_mobile_pkce_ticket_one_use_and_logout(client):
-    verifier = "a" * 64
-    response = client.get(
-        "/auth/login?mobile_challenge=" + challenge_for(verifier), follow_redirects=False
-    )
-    ticket = parse_qs(urlparse(response.headers["location"]).query)["ticket"][0]
-    assert (
-        client.post(
-            "/api/mobile/session", json={"ticket": ticket, "verifier": "b" * 64}
-        ).status_code
-        == 401
-    )
-    response = client.post("/api/mobile/session", json={"ticket": ticket, "verifier": verifier})
-    assert response.status_code == 200
-    assert (
-        client.post(
-            "/api/mobile/session", json={"ticket": ticket, "verifier": verifier}
-        ).status_code
-        == 401
-    )
-    token = response.json()["token"]
-    headers = {"Authorization": "Bearer " + token, "Origin": "", "X-CSRF-Token": ""}
-    assert client.get("/api/me", headers=headers).json()["sub"] == "demo-human"
-    value = create(client)
-    assert (
-        client.post(
-            f"/api/requests/{value['id']}/decision",
-            headers=headers,
-            json={"decision": "approve", "digest": value["digest"]},
-        ).status_code
-        == 200
-    )
-    assert client.post("/api/logout", headers=headers).status_code == 200
-    assert client.get("/api/me", headers=headers).status_code == 401
-    with client.app.state.store.connection() as db:
-        assert not db.execute("SELECT * FROM mobile_sessions").fetchall()
-
-
-def test_mobile_ticket_expiry(client):
-    verifier = "a" * 64
-    response = client.get(
-        "/auth/login?mobile_challenge=" + challenge_for(verifier), follow_redirects=False
-    )
-    ticket = parse_qs(urlparse(response.headers["location"]).query)["ticket"][0]
-    with client.app.state.store.connection() as db:
-        db.execute("UPDATE mobile_tickets SET expires=0")
-    assert (
-        client.post(
-            "/api/mobile/session", json={"ticket": ticket, "verifier": verifier}
-        ).status_code
-        == 401
-    )
-
-
-def test_no_secrets_in_cookie(client):
-    cookie = client.cookies["hooapprove_session"]
-    payload = base64.b64decode(cookie.split(".")[0]).decode()
-    assert TOKEN not in payload
-    assert "access_token" not in payload
 
 
 def test_production_fails_closed(tmp_path):

@@ -52,6 +52,6 @@ zwischen Kontrolle und finalem Request sind ohne Upstream-Versionszaun nicht vol
 Gefüllter echter Checkout und abschließende Bestellung sind im Ausgangsprojekt noch nicht live
 abgenommen. Dafür benötigt es die konkrete Nutzerfreigabe für Warenkorb, Lieferdetails und Betrag.
 
-Vor Produktionsaktivierung: HooApprove bereitstellen, OIDC-Anmeldung auf dem tatsächlichen Handy
+Vor Produktionsaktivierung: HooApprove bereitstellen, kontofreie QR-Gerätekopplung auf dem tatsächlichen Handy
 prüfen, den korrekten OpenHoo-Subject fest verbinden, Dienst-Secret sicher provisionieren und die
 Push-Anfrage tatsächlich empfangen. Keine Konto-/Warenkorb-/Zahlungsänderungen als impliziter Test.

@@ -22,7 +22,6 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser",
       "expo-notifications",
       [
         "expo-local-authentication",
@@ -31,7 +30,15 @@
         }
       ],
       "expo-router",
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "HooApprove nutzt die Kamera zum Scannen deines Kopplungscodes.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "hooapprove",
     "splash": {
