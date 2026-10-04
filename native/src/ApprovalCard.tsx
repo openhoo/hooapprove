@@ -36,16 +36,16 @@ export function ApprovalCard({ item, busy, decide }: { item: Approval & { device
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   return <View style={s.card}>
-    <View style={s.rowBetween}><View style={s.service}><View style={s.serviceIcon}><Text style={s.serviceGlyph}>↗</Text></View><Text style={s.serviceText}>{item.service}</Text></View>
-      <View style={[s.badge, !pending && s.badgeDone]}><Text style={s.badgeText}>{statusLabels[item.status]}</Text></View></View>
+    <View style={s.rowBetween}><Text style={s.serviceText}>{item.service}</Text>
+      <Text style={s.badgeText}>{pending ? "Offen" : statusLabels[item.status]}</Text></View>
     <Text style={s.cardTitle}>{item.title}</Text><Text style={s.summary}>{item.summary}</Text>
     <View style={s.details}>{item.details.map((detail, i) => <View key={i} style={s.detail}><Text style={s.detailLabel}>{detail.label}</Text><Text style={s.detailValue}>{detail.value}</Text></View>)}</View>
-    <View style={s.rowBetween}><Text style={s.meta}>Aktion {item.digest.slice(0, 12)}</Text><Text style={s.meta}>{pending ? `Noch ${Math.max(0, Math.ceil((item.expires - now / 1000) / 60))} Min.` : statusLabels[item.status]}</Text></View>
-    {pending ? <><Slide disabled={busy} onApprove={() => decide(item, 'approve')} /><Text style={s.hint}>Nur die oben gezeigte Aktion wird freigegeben.</Text>
-      <Pressable disabled={busy} accessibilityRole="button" onPress={() => decide(item, 'reject')} style={s.reject}><Text style={s.rejectText}>Anfrage ablehnen</Text></Pressable></>
+    {pending && <Text style={s.meta}>Gültig für {Math.max(0, Math.ceil((item.expires - now / 1000) / 60))} Min.</Text>}
+    {pending ? <><Slide disabled={busy} onApprove={() => decide(item, 'approve')} />
+      <Pressable disabled={busy} accessibilityRole="button" onPress={() => decide(item, 'reject')} style={s.reject}><Text style={s.rejectText}>Ablehnen</Text></Pressable></>
       : <Pressable accessibilityRole="button" style={s.eventButton} onPress={async () => {
         try { setEvents(await api(`/api/requests/${item.id}/events`, undefined, 'GET', item.deviceId)); } catch { Alert.alert('Verlauf nicht verfügbar', 'Bitte versuche es erneut.'); }
-      }}><Text style={s.meta}>{events ? 'Entscheidungsverlauf' : 'Entscheidungsverlauf anzeigen ↓'}</Text>
+      }}><Text style={s.meta}>{events ? 'Verlauf' : 'Verlauf anzeigen'}</Text>
         {events?.map((event, i) => <Text key={i} style={s.event}>{new Date(event.occurred * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · {eventLabels[event.event] || event.event}</Text>)}</Pressable>}
   </View>;
 }
