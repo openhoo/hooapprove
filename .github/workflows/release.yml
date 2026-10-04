@@ -82,7 +82,7 @@ jobs:
     defaults:
       run: {working-directory: native}
     env:
-      EXPO_PUBLIC_HOOAPPROVE_URL: http://127.0.0.1:8097
+      EXPO_PUBLIC_HOOAPPROVE_URL: https://approve.openhoo.dev
       NODE_ENV: production
       CMAKE_BUILD_PARALLEL_LEVEL: '2'
     steps:
@@ -95,14 +95,14 @@ jobs:
     - run: npm ci --include=dev --no-audit --no-fund
     - run: npx expo prebuild --platform android --no-install
     - run: cd android && ./gradlew assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
-    - name: Collect demo APK
+    - name: Collect preview APK
       run: |
         mkdir -p ../release-assets
-        cp android/app/build/outputs/apk/release/app-release.apk ../release-assets/hooapprove-demo-android-arm64.apk
-        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../release-assets/hooapprove-demo-android-arm64.apk
+        cp android/app/build/outputs/apk/release/app-release.apk ../release-assets/hooapprove-android-arm64.apk
+        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose ../release-assets/hooapprove-android-arm64.apk
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: android-demo
+        name: android-preview
         path: release-assets/*.apk
         if-no-files-found: error
         retention-days: 3
@@ -115,7 +115,7 @@ jobs:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       with: {ref: '${{ needs.verify.outputs.sha }}', persist-credentials: false}
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-      with: {name: android-demo, path: release-assets}
+      with: {name: android-preview, path: release-assets}
     - uses: azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a
       with: {version: v4.3.0}
     - name: Package chart and release metadata
@@ -136,14 +136,14 @@ jobs:
 
         Native approval app, generic authorization API, and Helm chart.
 
-        **Android APK:** demo only, ARM64, debug signed, bundled JavaScript, local API at
-        `http://127.0.0.1:8097`. Start the loopback demo service and use
-        `adb reverse tcp:8097 tcp:8097` on the connected Android device. This APK
-        does not send REWE orders and is not a Play Store release.
+        **Android APK:** ARM64, debug signed preview, bundled JavaScript, HTTPS API at
+        `https://approve.openhoo.dev`. Sign in with your authorized OpenHoo Apps identity.
+        The app is an approval client and cannot itself send REWE orders. This is not
+        a Play Store release. Push still requires EAS/APNs/FCM configuration.
 
         **Service image:** amd64/arm64, source revision and digest in the attached metadata.
         Production requires your HTTPS origin, OIDC client, protected executor credentials,
-        durable storage, and backups. The planned OpenHoo URL is not a deployment claim.
+        durable storage, and backups. Consult the deployment verification for actual OpenHoo runtime acceptance.
 
         **iOS:** source included; no signed IPA or TestFlight publication.
 
