@@ -9,7 +9,7 @@ einmal einlösen und ausführen.
 
 ## Veröffentlichung
 
-[Android-Vorschau herunterladen](https://github.com/openhoo/hooapprove/releases/latest) ·
+[Android-Vorschau herunterladen](https://github.com/openhoo/hooapprove/releases/download/v0.1.0-preview.2/hooapprove-android-arm64.apk) ·
 [Alle Preview-Releases](https://github.com/openhoo/hooapprove/releases) ·
 [Gehosteter Dienst](https://approve.openhoo.dev)
 
