@@ -37,7 +37,7 @@ uv run python scripts/run_wire_proof.py ../shooping-hooapprove
 - Produktions-Freigabetest `publication.noop`: ausdrücklich ohne Bestellung, Kosten oder REWE-Zugriff. Service-Token konnte nicht als Mensch entscheiden (401); Claim vor Freigabe gesperrt (409). Im Browser per Schieberegler freigegeben, einmal übernommen, wiederholter Claim gesperrt (409), Ergebnis `completed` gespeichert und im Verlauf erneut gelesen.
 - Backupjobs `publish-proof-20261004` und `publish-proof-completed-20261004`: abgeschlossen, Meldung `SQLite backup and isolated restore verified`. Aus dem zweiten Snapshot wurde die abgeschlossene Produktions-Testaktion mitsamt vier Ereignissen in eine isolierte Datenbank wiederhergestellt und erneut gelesen. Täglicher CronJob und gesonderter Backup-PVC aktiv. Der überprüfte Exporter mit HooApprove-Snapshot wurde auf hooapps-01 installiert und bytegenau verglichen. Ein neuer tatsächlicher Offsite-Transfer wurde in dieser Abnahme nicht ausgeführt.
 - Release `v0.1.0-preview.1`: APK, Multiarch-Image, Helm-Chart und Prüfsummen veröffentlicht. APK-Prüfsumme und APK-v2-Signatur geprüft, Installation auf Android-15-ARM64-Emulator erfolgreich. Diese erste APK verwendet localhost und benötigt ADB reverse für den Demo-Dienst.
-- Release `v0.1.0-preview.2` ist veröffentlicht (Workflow `37201668093` erfolgreich). Alle heruntergeladenen Assets stimmen mit `SHA256SUMS` überein. APK-SHA256: `1ab0c7ef827daab93ad3b9963373728e0a349813a8b89563fd795cda5659fc0e`. APK-v2-Signatur gültig, eingebettetes Hermes-Bundle enthält den gehosteten HTTPS-Dienst und keine Demo-Localhost-Adresse. Installation/Update auf dem vorhandenen Android-15-ARM64-Emulator erfolgreich. Das native UI ist unverändert.
+- Release `v0.1.0-preview.2` ist veröffentlicht (Workflow `37201668093` erfolgreich). Alle heruntergeladenen Assets stimmen mit `SHA256SUMS` überein. APK-SHA256: `1ab0c7ef827daab93ad3b9963373728e0a349813a8b89563fd795cda5659fc0e`. APK-v2-Signatur gültig, eingebettetes Hermes-Bundle enthält den gehosteten HTTPS-Dienst und keine Demo-Localhost-Adresse. Installation/Update auf dem vorhandenen Android-15-ARM64-Emulator erfolgreich. Die veröffentlichte APK wurde anschließend tatsächlich gestartet; ihre native Oberfläche und der Wechsel über „Mit OpenHoo anmelden“ zum echten `auth.openhoo.ai`-Login im Android-Systembrowser wurden sichtbar geprüft. Für den vollständigen Rücksprung und die Freigabe fehlt noch die lokale menschliche Anmeldung im Emulator. Das native UI ist unverändert.
 - Private Shooping-Integration: https://github.com/openhoo/shooping, `main`, 85 CI-Tests bestanden. Das Remote-Gate ist opt-in; der bestehende REWE-Dienst wurde nicht auf die neue Integration umgeschaltet.
 
 ## Noch nicht als live bestanden
@@ -69,3 +69,23 @@ GitHub-Actions-Builder; ein erfolgreich gebautes und installiertes APK liegt vor
 Die konfigurierte Git-Signierung funktioniert wieder. Quellcode, Tags und Releases
 wurden veröffentlicht; der Dienst wurde über die gemergten Auth-/GitOps-Änderungen
 ausgerollt. Die frühere Aussage „kein APK/kein Push“ ist damit überholt.
+
+## Fortsetzung: mobile Verteilung und Container-Anbindung
+
+- EAS-CLI `whoami`: nicht angemeldet. Das Expo-Konto/die Organisation und das
+  Apple-Developer-Team sind noch nicht zugeordnet. Keine neuen Konten, Projekte,
+  Apple-Profile oder Push-Credentials wurden ohne diese Zuordnung angelegt.
+- Xcode 26.5 ist lokal verfügbar; geprüft wurde ein gültiges Apple-Development-
+  Zertifikat. Das belegt keine Distribution-/TestFlight-Berechtigung. Es sind keine
+  verfügbaren iOS-Simulator-Geräte eingerichtet.
+- REWE-Compose reicht jetzt optional `SHOOPING_HOOAPPROVE_CONFIG_FILE` in den
+  Container weiter. Der Pfad liegt im bestehenden privaten State-Mount; ohne
+  Opt-in bleibt der bisherige Modus erhalten. Beide gerenderten Varianten wurden
+  geprüft; erneut 85 Shooping-Tests bestanden. Die laufende REWE-Instanz wurde
+  noch nicht umgeschaltet und kein Kontostand verändert.
+- Der bestehende Dependabot-PR zur URI-Decoder-Meldung würde Expo Router 58
+  in das SDK-57-Projekt einführen. Sein `npm ci` scheitert am Peer-Konflikt
+  mit `expo-constants`; er wurde nicht übernommen. Der aktuelle Auditstand bleibt
+  10 moderate/19 high Meldungen; für `braces` und `node-forge` weist die
+  Sicherheitsmeldung keine gepatchte Version aus. Kein pauschales Major-Downgrade
+  oder `--force` wurde durchgeführt.

@@ -1,8 +1,8 @@
 # Direkte Anbindung an den vorhandenen REWE-MCP
 
-Arbeitsbaum: `/Users/wakemeup/projects/openhoo/shooping-hooapprove`, Branch `feat/hooapprove`.
-Ausgangsrepository: `/Users/wakemeup/Documents/Codex/2026-10-03/i-w/outputs/shooping`.
-Basiscommit: `c6d3153`.
+Veröffentlichter Adapter: privates Repository `openhoo/shooping`, Default-Branch `main`.
+Lokaler Integrations-Arbeitsbaum: `/Users/wakemeup/projects/openhoo/shooping-hooapprove`.
+Der ursprüngliche aktive REWE-Dienst wird vor der nativen Abnahme nicht umgeschaltet.
 
 Die Anbindung ist optional aktivierbar über `SHOOPING_HOOAPPROVE_CONFIG_FILE`.
 Die geschützte Konfiguration enthält den HooApprove-Origin, Dienst-Token, Dienstnamen und die
@@ -55,3 +55,11 @@ abgenommen. Dafür benötigt es die konkrete Nutzerfreigabe für Warenkorb, Lief
 Vor Produktionsaktivierung: HooApprove bereitstellen, OIDC-Anmeldung auf dem tatsächlichen Handy
 prüfen, den korrekten OpenHoo-Subject fest verbinden, Dienst-Secret sicher provisionieren und die
 Push-Anfrage tatsächlich empfangen. Keine Konto-/Warenkorb-/Zahlungsänderungen als impliziter Test.
+
+## Docker Compose
+
+Das private REWE-Repository reicht `SHOOPING_HOOAPPROVE_CONFIG_FILE` nun auch
+über Compose weiter. Der Wert muss ein Containerpfad im bestehenden State-Mount
+sein, zum Beispiel `/var/lib/shooping/hooapprove.json`. Die Host-Datei bleibt
+0600, die feste Nutzer-/Kontozuordnung wird vom Operator provisioniert. Die
+vollständige Startanleitung steht in Shooping unter `docs/deployment.md`.
