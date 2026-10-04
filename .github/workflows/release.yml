@@ -116,6 +116,8 @@ jobs:
       with: {ref: '${{ needs.verify.outputs.sha }}', persist-credentials: false}
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with: {name: android-demo, path: release-assets}
+    - uses: azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a
+      with: {version: v4.3.0}
     - name: Package chart and release metadata
       env:
         IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
