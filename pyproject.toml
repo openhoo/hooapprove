@@ -3,7 +3,13 @@ name = "hooapprove"
 version = "0.1.0"
 description = "Human authorization for consequential agent actions"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "authlib>=1.6,<2", "httpx>=0.28,<1", "itsdangerous>=2.2,<3", "pywebpush>=2,<3"]
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "httpx>=0.28,<1", "cryptography>=45,<50"]
+
+[project.optional-dependencies]
+pairing = ["segno>=1.6,<2"]
+
+[project.scripts]
+hooapprove-pair = "hooapprove.pair_cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.11,<1"]

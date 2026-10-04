@@ -137,12 +137,12 @@ jobs:
         Native approval app, generic authorization API, and Helm chart.
 
         **Android APK:** ARM64, debug signed preview, bundled JavaScript, HTTPS API at
-        `https://approve.openhoo.dev`. Sign in with your authorized OpenHoo Apps identity.
+        `https://approve.openhoo.dev`. Pair the phone once with a private QR code; no account or login.
         The app is an approval client and cannot itself send REWE orders. This is not
         a Play Store release. Push still requires EAS/APNs/FCM configuration.
 
         **Service image:** amd64/arm64, source revision and digest in the attached metadata.
-        Production requires your HTTPS origin, OIDC client, protected executor credentials,
+        Production requires your HTTPS origin, protected executor credentials,
         durable storage, and backups. Consult the deployment verification for actual OpenHoo runtime acceptance.
 
         **iOS:** source included; no signed IPA or TestFlight publication.
