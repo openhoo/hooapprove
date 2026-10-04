@@ -1,4 +1,4 @@
-# Lokale Abnahme · 4. Oktober 2026
+# Veröffentlichung und Abnahme · 4. Oktober 2026
 
 ## Verifiziert
 
@@ -27,13 +27,26 @@ cd ../hooapprove
 uv run python scripts/run_wire_proof.py ../shooping-hooapprove
 ```
 
+## Veröffentlicht und live geprüft
+
+- Öffentlicher Quellcode: https://github.com/openhoo/hooapprove, Default-Branch `main`.
+- Dienst: https://approve.openhoo.dev, HTTPS-Startseite HTTP 200 und `/healthz` mit `mode=production`.
+- Argo CD: Revision `2812619431d9caebf4ceb80a205b66b1f9e4c0b0`, Synced/Healthy; API und beide Tunnel-Replikate Ready, keine Neustarts.
+- Tatsächlich laufendes Image: `ghcr.io/openhoo/hooapprove@sha256:a8dd3997a6227adfe43bac6109c7f67eb6bcfea5ae7aa817700e0bb46aa7b5a6`.
+- OpenHoo-OIDC: registrierter Apps-Client, tatsächliche Anmeldung mit bestehender SSO-Sitzung, persönlicher Posteingang sichtbar.
+- Produktions-Freigabetest `publication.noop`: ausdrücklich ohne Bestellung, Kosten oder REWE-Zugriff. Service-Token konnte nicht als Mensch entscheiden (401); Claim vor Freigabe gesperrt (409). Im Browser per Schieberegler freigegeben, einmal übernommen, wiederholter Claim gesperrt (409), Ergebnis `completed` gespeichert und im Verlauf erneut gelesen.
+- Backupjobs `publish-proof-20261004` und `publish-proof-completed-20261004`: abgeschlossen, Meldung `SQLite backup and isolated restore verified`. Aus dem zweiten Snapshot wurde die abgeschlossene Produktions-Testaktion mitsamt vier Ereignissen in eine isolierte Datenbank wiederhergestellt und erneut gelesen. Täglicher CronJob und gesonderter Backup-PVC aktiv. Der überprüfte Exporter mit HooApprove-Snapshot wurde auf hooapps-01 installiert und bytegenau verglichen. Ein neuer tatsächlicher Offsite-Transfer wurde in dieser Abnahme nicht ausgeführt.
+- Release `v0.1.0-preview.1`: APK, Multiarch-Image, Helm-Chart und Prüfsummen veröffentlicht. APK-Prüfsumme und APK-v2-Signatur geprüft, Installation auf Android-15-ARM64-Emulator erfolgreich. Diese erste APK verwendet localhost und benötigt ADB reverse für den Demo-Dienst.
+- Release `v0.1.0-preview.2` ist veröffentlicht (Workflow `37201668093` erfolgreich). Alle heruntergeladenen Assets stimmen mit `SHA256SUMS` überein. APK-SHA256: `1ab0c7ef827daab93ad3b9963373728e0a349813a8b89563fd795cda5659fc0e`. APK-v2-Signatur gültig, eingebettetes Hermes-Bundle enthält den gehosteten HTTPS-Dienst und keine Demo-Localhost-Adresse. Installation/Update auf dem vorhandenen Android-15-ARM64-Emulator erfolgreich. Das native UI ist unverändert.
+- Private Shooping-Integration: https://github.com/openhoo/shooping, `main`, 85 CI-Tests bestanden. Das Remote-Gate ist opt-in; der bestehende REWE-Dienst wurde nicht auf die neue Integration umgeschaltet.
+
 ## Noch nicht als live bestanden
 
-- Produktionsadresse, DNS/TLS, GitOps-Rollout und Wiederherstellungstest.
-- Echte OpenHoo-OIDC-Registrierung und vollständiger Login auf dem Zielhandy.
-- Native Installation, Screenreader-/Touch-Gerätetest, Biometrie und tatsächliche Push-Zustellung.
-- Apple-Signierung/TestFlight beziehungsweise Play-Store-Freigabe.
-- Echter gefüllter REWE-Checkout und echte Bestellung. Alle neuen Bestelltests sind synthetisch.
+- Vollständiger Login/Freigabeablauf in der nativen App auf einem physischen Handy; Screenreader-/Touch-Gerätetest, Biometrie und tatsächliche Push-Zustellung. Der Dienst und die Browserfreigabe wurden live geprüft; die installierte APK ist kein Beleg für diese Handytests.
+- Apple-Signierung/TestFlight beziehungsweise Play-Store-Freigabe. Android-Vorschauen sind mit dem Debug-Schlüssel signiert.
+- Echter gefüllter REWE-Checkout und echte Bestellung. Alle neuen Bestelltests sind synthetisch. Die produktive REWE-Integration bleibt opt-in.
+- Server-verifizierbare Transaktionssignatur: lokale Biometrie stellt keine formale eTAN dar.
+- Atomare upstreamseitige Versionssperre zwischen letzter REWE-Datenprüfung und Bestellaufruf.
 
 ## Abhängigkeiten
 
@@ -48,25 +61,11 @@ dürfen nicht als ungeprüfter öffentlich zugänglicher Dienst betrieben werden
 FastAPI/Authlib melden die künftige Umstellung ihrer Test-/HTTP-Adapter auf `httpx2` als
 Deprecation-Warnung. Die verwendeten Tests und der HTTP-Verbund bestehen mit dem gelockten Stand.
 
-## Konkreter Android-Build-Blocker
+## Aufgelöste lokale Blocker
 
-Der lokale AMD64-Android-Build am 4. Oktober 2026 erreichte die nativen
-CMake-/Kotlin-Schritte, lieferte aber noch kein APK. Die gemeinsame OrbStack-VM
-antwortet seit dem Build weder auf Docker-Abfragen noch auf einen gezielten
-Stop-Aufruf für `hooapprove-android-build`. Ihr Kernel-Log enthält mehrfach
-`VM_FAULT_OOM`; die alleinige Ursache des Stillstands ist damit nicht bewiesen.
-Es wurde kein Neustart der gemeinsamen VM ausgelöst, da das andere Container
-betreffen kann. Der Zustand des Build-Containers ist aktuell nicht abfragbar.
-Nach Wiederherstellung der Engine zuerst gezielt den alten Build stoppen:
-
-```sh
-docker stop --time 1 hooapprove-android-build
-```
-
-Danach den dokumentierten Build mit freiem Speicher wiederholen. Es gibt noch
-kein erfolgreich gebautes oder installiertes HooApprove-APK als Abnahmebeleg.
-Die sichtbare native UI-Abnahme war zusätzlich durch den gesperrten Mac blockiert.
-
-Die lokalen Feature-Änderungen sind gestaged. Ein Shooping-Commit scheiterte am
-nicht verfügbaren 1Password-Signierzugriff; die konfigurierte Signierung wurde
-nicht geändert. Kein Push und keine Veröffentlichung erfolgt.
+Der erste lokale Android-Build scheiterte während CMake/Kotlin in der gemeinsamen
+OrbStack-VM. Die Veröffentlichung erfolgte anschließend über den geprüften
+GitHub-Actions-Builder; ein erfolgreich gebautes und installiertes APK liegt vor.
+Die konfigurierte Git-Signierung funktioniert wieder. Quellcode, Tags und Releases
+wurden veröffentlicht; der Dienst wurde über die gemergten Auth-/GitOps-Änderungen
+ausgerollt. Die frühere Aussage „kein APK/kein Push“ ist damit überholt.

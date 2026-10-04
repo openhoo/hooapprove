@@ -88,8 +88,8 @@ npx expo export --platform ios --platform android
 ```
 
 Die API-Adresse wird bei einem Build durch `EXPO_PUBLIC_HOOAPPROVE_URL` festgelegt.
-Die voreingestellte geplante Produktionsadresse ist `https://approve.openhoo.dev`.
-Die Adresse ist keine Behauptung, dass der Dienst dort bereits läuft.
+Die Produktionsadresse ist `https://approve.openhoo.dev`. Der Dienst ist ausgerollt;
+die live geprüften Abläufe und offenen Handytests stehen in [docs/verification.md](docs/verification.md).
 
 Eine App-Anmeldung öffnet `/auth/login` im Systembrowser. Der OIDC-Callback erstellt ein
 60 Sekunden gültiges, einmaliges Übergabeticket. Der native Client löst dieses mit seinem
