@@ -150,7 +150,7 @@ jobs:
         Native dependency audit, actual push delivery, physical-device biometrics and real
         REWE checkout remain release gates. See docs/verification.md and docs/architecture.md.
         NOTES
-        (cd release-assets && sha256sum *.apk *.tgz IMAGE.txt SOURCE.txt > SHA256SUMS)
+        (cd release-assets && sha256sum -- ./*.apk ./*.tgz IMAGE.txt SOURCE.txt > SHA256SUMS)
     - name: Publish prerelease
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
