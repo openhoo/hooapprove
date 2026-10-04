@@ -24,7 +24,7 @@ ist ebenfalls nicht erneut einlösbar. Ablehnen, Ablaufen oder Netzwerkfehler be
 
 1. Der vertrauenswürdige Executor verwendet einen fest konfigurierten Empfänger. Der Agent wählt keinen Subject.
 2. Der Executor liest den echten Aktionsstand und erzeugt daraus sowohl Darstellung als auch Payload.
-3. Die App zeigt den Ursprungsdienst, den vollständigen Vertrag und einen kurzen Inhaltsfingerabdruck.
+3. Die App zeigt den Ursprungsdienst und die vollständigen Aktionsdetails. Der Inhaltsdigest bleibt Teil der signierten Entscheidung; er ist kein zusätzlicher UI-Text.
 4. Nur signierte Anfragen des aktiven, für Dienst und Empfänger gekoppelten Geräts können entscheiden. Dienst-Tokens können es nicht.
 5. Der Executor liest vor Ausführung den Aktionsstand erneut. Jede Änderung braucht eine neue Freigabe.
 6. Ein Claim prüft Dienst, Digest, Zustand und Ablauf in einer `BEGIN IMMEDIATE`-Transaktion.

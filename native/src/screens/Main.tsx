@@ -80,7 +80,7 @@ function Main() {
       }
       await api(`/api/requests/${item.id}/decision`, { decision, digest: item.digest }, 'POST', item.deviceId);
       void Haptics.notificationAsync(decision === 'approve' ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
-      setNotice(decision === 'approve' ? 'Freigegeben. Die Aktion darf jetzt einmal ausgeführt werden.' : 'Anfrage abgelehnt.');
+      setNotice(decision === 'approve' ? 'Freigegeben.' : 'Abgelehnt.');
       await reload();
     } catch (e) {
       setError((e as Error).message === 'conflict' ? 'Diese Anfrage ist nicht mehr verfügbar. Bitte aktualisieren.' : 'Die Entscheidung konnte nicht bestätigt werden. Aktualisiere den Status, bevor du es erneut versuchst.');
@@ -91,7 +91,7 @@ function Main() {
     try {
       if (!Device.isDevice) return Alert.alert('Echtes Gerät erforderlich', 'Push-Benachrichtigungen werden auf einem Handy eingerichtet.');
       const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
-      if (!projectId) return Alert.alert('Noch nicht eingerichtet', 'Die App benötigt zuerst ein zugeordnetes Push-Projekt.');
+      if (!projectId) return Alert.alert('Noch nicht eingerichtet', 'Benachrichtigungen sind zurzeit nicht verfügbar.');
       if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('default', { name: 'Freigabe-Anfragen', importance: Notifications.AndroidImportance.HIGH });
       const permission = await Notifications.requestPermissionsAsync();
       if (permission.status !== 'granted') return Alert.alert('Benachrichtigungen deaktiviert', 'Du kannst offene Anfragen weiterhin in der App sehen.');
@@ -112,30 +112,39 @@ function Main() {
   if (initializing) return <SafeAreaView style={s.screen}><ActivityIndicator color={C.green} style={{ flex: 1 }} /></SafeAreaView>;
   return <SafeAreaView style={s.screen} edges={['top', 'left', 'right']}>
     <StatusBar style="dark" />
-    <View style={s.header}><View style={s.brand}><View style={s.logo}><Text style={s.logoText}>h<Text style={s.logoCheck}>✓</Text></Text></View><Text style={s.brandText}>HooApprove</Text></View>
-      {connections.length > 0 && <Pressable onPress={() => setSettings(!settings)} accessibilityRole="button" accessibilityLabel="Einstellungen" style={s.avatar}><Text style={s.avatarText}>⚙</Text></Pressable>}</View>
+    <View style={s.header}><Text style={s.brandText}>HooApprove</Text>
+      {connections.length > 0 && <Pressable onPress={() => setSettings(!settings)} accessibilityRole="button" accessibilityLabel={settings ? "Zurück zu den Anfragen" : "Einstellungen"} style={s.avatar}><Text style={s.avatarText}>{settings ? '×' : '⚙'}</Text></Pressable>}</View>
     <ScrollView contentContainerStyle={s.content} refreshControl={connections.length ? <RefreshControl refreshing={refreshing} tintColor={C.green} onRefresh={async () => { setRefreshing(true); setError(''); await reload(); setRefreshing(false); }} /> : undefined}>
-      <View style={s.intro}><Text style={s.eyebrow}>DEIN LETZTES WORT</Text><Text style={s.headline}>Gut vorbereitet.</Text><Text style={s.headlineItalic}>Von dir freigegeben.</Text><Text style={s.introText}>Deine Agenten erledigen die Arbeit.{"\n"}Bei wichtigen Aktionen entscheidest du.</Text></View>
-      {demo && <View style={s.demo}><Text style={s.demoText}>Vorschau mit Beispieldaten. Keine echte Bestellung.</Text></View>}
+      {demo && <View style={s.demo}><Text style={s.demoText}>Demo · keine echte Bestellung</Text></View>}
       {error ? <View style={s.error} accessibilityRole="alert"><Text style={s.errorText}>{error}</Text></View> : null}
       {notice ? <View style={s.notice} accessibilityLiveRegion="polite"><Text style={s.noticeText}>{notice}</Text></View> : null}
-      {!connections.length ? <View style={s.card}><Text style={s.eyebrow}>OHNE KONTO. OHNE ANMELDUNG.</Text><Text style={s.cardTitle}>Einmal verbinden.{'\n'}Dann entscheiden.</Text><Text style={s.summary}>Kopple dein Handy per QR-Code mit deinem Dienst. Wenn dein Agent eine wichtige Aktion vorbereitet hat, gibst du sie hier frei.</Text>
-        <Pressable style={s.primary} onPress={() => router.push('/pair')} accessibilityRole="button"><Text style={s.primaryText}>Dienst verbinden</Text><Text style={s.primaryArrow}>↗</Text></Pressable><Text style={s.hint}>Wie ein Authenticator für deine Aktionen.</Text></View>
-      : settings ? <View style={s.card}><Text style={s.eyebrow}>DEINE VERBINDUNGEN</Text><Text style={s.cardTitle}>Dieses Handy</Text>
-        {connections.map(connection => <View key={connection.device_id}><Text style={s.settingText}>{connection.label}</Text><Text style={s.hint}>{connection.service}{connection.pending ? ' · Kopplung wird geprüft' : ''}</Text><Pressable onPress={() => disconnect(connection)} style={s.settingButton} accessibilityRole="button"><Text style={s.rejectText}>Verbindung aufheben</Text></Pressable></View>)}
-        <Pressable onPress={() => router.push('/pair')} style={s.settingButton} accessibilityRole="button"><Text style={s.settingText}>＋ Weiteren Dienst verbinden</Text></Pressable>
-        <Pressable onPress={enablePush} style={s.settingButton} accessibilityRole="button"><Text style={s.settingText}>Benachrichtigungen aktivieren</Text><Text>↗</Text></Pressable>
-        <View style={s.settingButton}><View style={{ flex: 1 }}><Text style={s.settingText}>Biometrie vor jeder Freigabe</Text><Text style={s.hint}>{biometricsAvailable ? 'Face ID oder Fingerabdruck' : 'Auf diesem Gerät nicht eingerichtet'}</Text></View>
+      {!connections.length ? <View style={s.onboarding}>
+        <Text style={s.headline}>Dienst verbinden</Text>
+        <Text style={s.introText}>Scanne den QR-Code deines Dienstes.</Text>
+        <Pressable style={s.primary} onPress={() => router.push('/pair')} accessibilityRole="button"><Text style={s.primaryText}>Verbinden</Text></Pressable>
+      </View>
+      : settings ? <View><Text style={s.headline}>Einstellungen</Text><Text style={s.sectionTitle}>Verbindungen</Text>
+        {connections.map(connection => <View key={connection.device_id} style={s.connection}>
+          <Text style={s.settingText}>{connection.label}</Text>
+          <Text style={s.hint}>{connection.service}{connection.pending ? ' · Wird geprüft' : ''}</Text>
+          <Pressable onPress={() => disconnect(connection)} style={s.reject} accessibilityRole="button" accessibilityLabel={`${connection.label} trennen`}><Text style={s.rejectText}>Trennen</Text></Pressable>
+        </View>)}
+        <Pressable onPress={() => router.push('/pair')} style={s.settingButton} accessibilityRole="button"><Text style={s.settingText}>Dienst hinzufügen</Text></Pressable>
+        <Pressable onPress={enablePush} style={s.settingButton} accessibilityRole="button"><Text style={s.settingText}>Benachrichtigungen</Text></Pressable>
+        <View style={s.settingButton}><View style={{ flex: 1 }}><Text style={s.settingText}>Biometrie</Text><Text style={s.hint}>{biometricsAvailable ? 'Face ID oder Fingerabdruck' : 'Nicht eingerichtet'}</Text></View>
           <Switch value={biometrics} disabled={!biometricsAvailable} trackColor={{ true: C.green }} onValueChange={async value => {
             try { if (value) { const result = await LocalAuthentication.authenticateAsync({ promptMessage: 'Biometrie aktivieren', disableDeviceFallback: true, biometricsSecurityLevel: 'strong' }); if (!result.success) return; }
               await SecureStore.setItemAsync('hooapprove.biometric', value ? '1' : '0'); setBiometrics(value);
             } catch { setError('Biometrie konnte nicht eingerichtet werden.'); }
           }} /></View></View>
-      : <><View style={s.tabs}><Pressable style={[s.tab, !history && s.tabActive]} onPress={() => setHistory(false)} accessibilityRole="tab" accessibilityState={{ selected: !history }}><Text style={[s.tabText, !history && s.tabTextActive]}>Offen</Text><View style={s.count}><Text style={s.countText}>{pending.length}</Text></View></Pressable>
+      : <><View style={s.tabs}><Pressable style={[s.tab, !history && s.tabActive]} onPress={() => setHistory(false)} accessibilityRole="tab" accessibilityState={{ selected: !history }}><Text style={[s.tabText, !history && s.tabTextActive]}>Offen</Text>{pending.length > 0 && <Text style={s.countText}>{pending.length}</Text>}</Pressable>
           <Pressable style={[s.tab, history && s.tabActive]} onPress={() => setHistory(true)} accessibilityRole="tab" accessibilityState={{ selected: history }}><Text style={[s.tabText, history && s.tabTextActive]}>Verlauf</Text></Pressable></View>
         {demo && <Pressable accessibilityRole="button" style={s.demoButton} onPress={async () => { try { await api('/api/demo/request', {}); setHistory(false); await reload(); } catch { setError('Beispielanfrage konnte nicht erstellt werden.'); } }}><Text style={s.meta}>＋ Beispielanfrage erstellen</Text></Pressable>}
-        {visible.length ? visible.map(item => <ApprovalCard key={item.id} item={item} busy={busy} decide={decide} />) : <View style={s.empty}><View style={s.emptyIcon}><Text style={s.emptyCheck}>✓</Text></View><Text style={s.emptyTitle}>{history ? 'Noch keine Entscheidungen.' : 'Alles erledigt.'}</Text><Text style={s.emptyText}>{history ? 'Deine Freigaben und ihre Ergebnisse erscheinen hier.' : 'Sobald ein Agent deine Freigabe braucht, findest du die Anfrage hier.'}</Text></View>}</>}
-      <View style={s.footer}><Text style={s.footerText}>HooApprove · OpenHoo</Text><Text style={s.footerText}>Vorbereiten lassen. Bewusst entscheiden.</Text></View>
+        {visible.length ? visible.map(item => <ApprovalCard key={item.id} item={item} busy={busy} decide={decide} />) : <View style={s.empty}>
+          {!history && <View style={s.emptyIcon}><Text style={s.emptyCheck}>✓</Text></View>}
+          <Text style={s.emptyTitle}>{history ? 'Noch keine Entscheidungen' : 'Keine offenen Anfragen'}</Text>
+        </View>}</>}
+
     </ScrollView>
   </SafeAreaView>;
 }
