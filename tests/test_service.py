@@ -282,3 +282,102 @@ def test_digest_is_stable_across_dictionary_order():
     first = ActionRequest(**body(payload={"a": 1, "b": 2}))
     second = ActionRequest(**body(payload={"b": 2, "a": 1}))
     assert action_digest("rewe", first) == action_digest("rewe", second)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"title": "\ud800"},
+        {"details": [{"label": "a", "value": "\udfff"}]},
+        {"payload": {"\ud800": "value"}},
+    ],
+)
+def test_invalid_unicode_rejected_before_persistence(client, changes):
+    import json
+
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ActionRequest(**body(**changes))
+    response = client.post(
+        "/v1/requests",
+        content=json.dumps(body(**changes)),
+        headers={**service_headers(), "Content-Type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert client.get("/api/requests").json() == []
+
+
+def test_removed_recipient_cannot_consume_existing_approval(client):
+    from fastapi import HTTPException
+
+    value = create(client)
+    approve(client, value)
+    store = client.app.state.store
+    with pytest.raises(HTTPException) as failure:
+        store.claim(value["id"], "rewe", value["digest"], allowed_subjects=[])
+    assert failure.value.status_code == 403
+    assert store.get(value["id"], "rewe")["status"] == "approved"
+
+
+def test_competing_decisions_commit_only_one_terminal_decision(client):
+    value = create(client)
+
+    def decide(decision):
+        return client.post(
+            f"/api/requests/{value['id']}/decision",
+            json={"decision": decision, "digest": value["digest"]},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(decide, ["approve", "reject"]))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    events = client.get(f"/api/requests/{value['id']}/events").json()
+    assert len(events) == 2
+    assert events[-1]["event"] in {"approved", "rejected"}
+
+
+def test_cancellation_and_claim_are_mutually_exclusive(client):
+    value = create(client)
+    approve(client, value)
+
+    def transition(operation):
+        if operation == "claim":
+            return claim(client, value)
+        return client.post(f"/v1/requests/{value['id']}/cancel", headers=service_headers())
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(transition, ["claim", "cancel"]))
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    stored = client.app.state.store.get(value["id"], "rewe")
+    assert stored["status"] in {"executing", "cancelled"}
+    assert claim(client, value).status_code == 409
+    events = client.get(f"/api/requests/{value['id']}/events").json()
+    assert len(events) == 3
+
+
+def test_pending_request_remains_visible_amid_newer_terminal_history(client):
+    import time
+
+    store = client.app.state.store
+    pending, _ = store.create("rewe", ActionRequest(**body(idempotency_key="old-pending")))
+    expired, _ = store.create("rewe", ActionRequest(**body(idempotency_key="old-expired")))
+    for number in range(105):
+        store.create("rewe", ActionRequest(**body(idempotency_key=f"history-{number}")))
+    with store.connection() as db:
+        db.execute(
+            "UPDATE requests SET status='rejected' WHERE id NOT IN (?,?)",
+            (pending["id"], expired["id"]),
+        )
+        # Expiration must happen before prioritization: an expired pending row
+        # cannot push out a request that still needs a human decision.
+        db.execute(
+            "UPDATE requests SET expires=0,created=? WHERE id=?",
+            (time.time() + 1, expired["id"]),
+        )
+    inbox = client.get("/api/requests").json()
+    assert len(inbox) == 100
+    assert inbox[0]["id"] == pending["id"]
+    assert inbox[0]["status"] == "pending"
+    expired_row = next(row for row in inbox if row["id"] == expired["id"])
+    assert expired_row["status"] == "expired"

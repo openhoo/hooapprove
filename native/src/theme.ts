@@ -32,7 +32,7 @@ export const s = StyleSheet.create({
   detailLabel: { width: 80, color: C.muted, fontSize: 13, lineHeight: 20 },
   detailValue: { flex: 1, fontSize: 14, lineHeight: 20, color: C.green },
   meta: { color: C.muted, fontSize: 12, lineHeight: 18 },
-  slide: { height: 60, marginTop: 16, backgroundColor: C.soft, borderRadius: 30, justifyContent: 'center', paddingLeft: 56 },
+  slide: { minHeight: 60, paddingVertical: 16, marginTop: 16, backgroundColor: C.soft, borderRadius: 30, justifyContent: 'center', paddingLeft: 56 },
   slideText: { textAlign: 'center', color: C.green, fontSize: 14, paddingRight: 16 },
   thumb: { position: 'absolute', left: 6, top: 6, width: 48, height: 48, backgroundColor: C.green, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   thumbText: { fontSize: 26, color: C.paper, marginTop: -2 },

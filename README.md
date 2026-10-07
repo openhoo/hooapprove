@@ -90,6 +90,13 @@ reference = client.execute(request["id"], current_action, place_exact_order)
 Geänderter Aktionsstand benötigt eine neue Freigabe. Nach verlorenem Claim oder unklarer
 Bestellantwort wird keine Mutation automatisch wiederholt. Freigabe ist keine Erfolgsmeldung.
 
+Wenn die Aktion erfolgreich war, aber ihre Ergebnismeldung scheitert, wirft der Python-Client
+`ExecutionResultReportingError`. `request_id`, `execution_id` und `reference` ermöglichen den
+Abgleich; die Aktion darf nicht wiederholt werden. Das Beispiel `GuardedCheckout` bindet die
+Idempotenz an den vollständigen Aktionsstand. Für einen ausdrücklich neuen Versuch nach
+Ablehnung, Stornierung oder Ablauf kann der vertrauenswürdige Executor eine neue `attempt_id`
+festlegen; automatische Ersatzversuche nach unklarer Ausführung sind weiterhin verboten.
+
 ## Lokal entwickeln
 
 ```sh
@@ -100,6 +107,7 @@ cd native
 npm ci
 npm run check
 npm run lint
+npm test
 EXPO_PUBLIC_HOOAPPROVE_URL=http://127.0.0.1:8097 npx expo start
 ```
 

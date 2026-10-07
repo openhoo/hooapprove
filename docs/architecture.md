@@ -61,11 +61,28 @@ aufbewahrt und atomar einmal verbraucht. Query-Parameter sind nicht zulässig. E
 bindet zusätzlich den unveränderlichen Aktionsdigest. Die Entscheidungstransaktion prüft
 Gerätewiderruf erneut und prüft sowohl Dienst als auch Empfänger.
 
+Öffentliche Ed25519-Schlüssel müssen kanonische Punkte der Primordnungs-Untergruppe sein.
+Diese Prüfung findet sowohl bei Enrollment als auch bei jedem Gerätenachweis statt, damit
+auch ältere gespeicherte Schlüssel keine Ausnahme bilden. PyNaCl/libsodium prüft Kodierung,
+Kurvenzugehörigkeit und kleine Ordnungen; eine zusätzliche Untergruppenprüfung schützt
+auch gegen das dokumentierte Verhalten älterer libsodium-Versionen.
+
 Ein verlorener Enrollment-Response wird mit dem bereits gespeicherten Schlüssel über eine
 signierte Statusabfrage abgeglichen. Der Schlüssel wird nicht automatisch verworfen.
 Verbindung aufheben benötigt eine signierte Geräteanfrage und eine lokale Bestätigung.
 Verlorene Geräte benötigen eine ausdrücklich vertrauenswürdige Operator-Wiederherstellung;
 eine selbstständige Agenten-Wiederherstellung ist nicht implementiert.
+
+Der Widerruf sperrt künftige Gerätenachweise. Bereits erteilte Freigaben werden dadurch
+nicht zurückgezogen; der Ursprungsdienst kann unbeanspruchte Anfragen ausdrücklich stornieren.
+Entfernt der Betreiber einen Empfänger aus der Dienstkonfiguration, sind weitere Claims für
+ihn gesperrt. Ergebnisse einer bereits beanspruchten Aktion bleiben meldbar.
+
+Ein fehlgeschlagener Kopplungsversuch kann einen lokalen ausstehenden Schlüssel hinterlassen.
+Dieser bleibt nach Timeout erhalten. Vor einer ausdrücklich bestätigten lokalen Bereinigung
+prüft die App den gespeicherten Schlüssel erneut beim Server; eine erfolgreiche Abfrage
+bestätigt die Verbindung. Ohne eindeutigen Nachweis eines nicht mehr gekoppelten Geräts
+wird der Schlüssel nicht verworfen.
 
 Biometrie ist optional und lokal. Signaturen beweisen den Besitz des Geräteschlüssels,
 keine Plattformattestierung oder serverprüfbare biometrische Benutzeranwesenheit.
@@ -90,6 +107,11 @@ Uvicorn läuft deshalb ohne Access-Log, und der Reverse Proxy muss dieselbe Rege
 Eine Instanz mit SQLite und dauerhaftem Volume. Horizontale Skalierung braucht einen anderen
 transaktionalen Store und gemeinsame Geräte-/Notification-Zustände. Ingress muss zusätzlich
 Verbindungs-/Ratenlimits und angemessene Timeouts setzen. Die Anwendung begrenzt Request-Bodies.
+
+Validierungsfehler enthalten weder Eingabewerte noch private Feldnamen. Dienstkonfigurationen
+verlangen eindeutige Tokens und explizite Empfängerlisten. Der Helm-Chart akzeptiert nur
+SHA-256-gepinnte Images und HTTPS-Origins. Der Host-Abgleich unterstützt auch geklammerte
+IPv6-Loopback-Adressen für lokale Demonstrationen.
 
 Wiederherstellungen können Freigabe-Replay verursachen. Ausführung erst wieder aktivieren, nachdem
 alle offenen Freigaben verworfen und externe Wirkungen abgeglichen wurden. Bei verlorener Claim-

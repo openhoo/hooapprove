@@ -35,12 +35,59 @@ class Settings:
         )
 
     def validate(self):
+        if any(character.isspace() or ord(character) < 33 for character in self.public_url):
+            raise ValueError("Public URL must not contain whitespace or control characters")
         url = urlparse(self.public_url)
+        if (
+            url.scheme not in {"http", "https"}
+            or not url.hostname
+            or url.username is not None
+            or url.password is not None
+            or url.path not in {"", "/"}
+            or url.query
+            or url.fragment
+        ):
+            raise ValueError("Public URL must be an HTTP(S) origin without credentials")
+        try:
+            _ = url.port
+        except ValueError:
+            raise ValueError("Public URL has an invalid port") from None
+        host = f"[{url.hostname}]" if ":" in url.hostname else url.hostname
+        authority = url.netloc.lower()
+        if not host.isascii() or not (
+            authority == host
+            or (
+                authority.startswith(host + ":")
+                and authority[len(host) + 1 :].isascii()
+                and authority[len(host) + 1 :].isdigit()
+            )
+        ):
+            raise ValueError("Public URL must have a valid ASCII host and optional numeric port")
         if self.demo:
             if url.hostname not in {"127.0.0.1", "localhost", "::1", "testserver"}:
                 raise ValueError("Demo mode is restricted to loopback")
         elif url.scheme != "https" or not url.hostname:
             raise ValueError("Production requires HTTPS")
+        if not isinstance(self.services, dict):
+            raise ValueError("Services must be a mapping")
+        tokens = set()
         for name, service in self.services.items():
-            if len(service.get("token", "")) < 32 or not service.get("subjects"):
-                raise ValueError(f"Service {name} requires a strong token and explicit subjects")
+            if not isinstance(name, str) or not name.strip() or not isinstance(service, dict):
+                raise ValueError("Services require nonempty names and configuration mappings")
+            token, subjects = service.get("token"), service.get("subjects")
+            if (
+                not isinstance(token, str)
+                or len(token) < 32
+                or not token.isascii()
+                or any(ord(character) < 33 or ord(character) > 126 for character in token)
+                or not isinstance(subjects, list)
+                or not subjects
+                or any(
+                    not isinstance(subject, str) or not subject.strip() or len(subject) > 200
+                    for subject in subjects
+                )
+            ):
+                raise ValueError("Each service requires a strong token and explicit subject list")
+            if token in tokens:
+                raise ValueError("Service tokens must be unique")
+            tokens.add(token)

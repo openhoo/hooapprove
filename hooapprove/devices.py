@@ -8,9 +8,21 @@ import time
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import HTTPException, Request
+from nacl.bindings import (
+    crypto_core_ed25519_add,
+    crypto_core_ed25519_is_valid_point,
+    crypto_scalarmult_ed25519_noclamp,
+)
+from nacl.exceptions import CryptoError
 from pydantic import Field
 
 from .models import StrictModel
+
+# See https://doc.libsodium.org/advanced/point-arithmetic. Versions <=1.0.20
+# may admit mixed-order points in is_valid_point; the documented subgroup test
+# uses (L-1)*P + P == identity. All curve operations stay in libsodium.
+ED25519_L_MINUS_ONE = (2**252 + 27742317777372353535851937790883648492).to_bytes(32, "little")
+ED25519_IDENTITY = b"\x01" + bytes(31)
 
 
 class PairingRequest(StrictModel):
@@ -43,10 +55,14 @@ def device_message(device_id, method, path, timestamp, nonce, body):
 
 def verify(public_key, signature, message):
     try:
-        Ed25519PublicKey.from_public_bytes(bytes.fromhex(public_key)).verify(
-            bytes.fromhex(signature), message
-        )
-    except (ValueError, InvalidSignature):
+        key = bytes.fromhex(public_key)
+        if len(key) != 32 or not crypto_core_ed25519_is_valid_point(key):
+            raise ValueError("Unsafe device public key")
+        multiple = crypto_scalarmult_ed25519_noclamp(ED25519_L_MINUS_ONE, key)
+        if crypto_core_ed25519_add(multiple, key) != ED25519_IDENTITY:
+            raise ValueError("Unsafe device public key")
+        Ed25519PublicKey.from_public_bytes(key).verify(bytes.fromhex(signature), message)
+    except (ValueError, InvalidSignature, CryptoError):
         raise HTTPException(401, "Invalid device proof") from None
 
 
@@ -122,7 +138,7 @@ async def paired_device(request: Request):
     try:
         fresh = abs(time.time() - int(timestamp)) <= 60
         valid_nonce = len(nonce) == 32 and len(bytes.fromhex(nonce)) == 16
-    except ValueError:
+    except (ValueError, OverflowError):
         fresh = valid_nonce = False
     if not fresh or not valid_nonce or request.url.query:
         raise HTTPException(401, "Invalid or stale device proof")

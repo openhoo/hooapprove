@@ -149,9 +149,10 @@ class Store:
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             self.expire(db)
-            self.active_device(db, device_id)
+            self.recipient_device(db, device_id, subject, service)
             rows = db.execute(
-                "SELECT * FROM requests WHERE subject=? AND service=? ORDER BY created DESC LIMIT 100",
+                "SELECT * FROM requests WHERE subject=? AND service=? "
+                "ORDER BY CASE WHEN status='pending' THEN 0 ELSE 1 END, created DESC LIMIT 100",
                 (subject, service),
             ).fetchall()
             return [self.public(row) for row in rows]
@@ -165,7 +166,7 @@ class Store:
     def decide(self, rid, subject, decision, service, device_id):
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
-            self.active_device(db, device_id)
+            self.recipient_device(db, device_id, subject, service)
             # Expiry is checked inside the transaction, even if nobody has polled.
             row = self.owned(db, rid, "subject", subject)
             if row["service"] != service:
@@ -181,10 +182,12 @@ class Store:
             self.event(db, rid, subject, status)
             return self.public(self.owned(db, rid, "subject", subject))
 
-    def claim(self, rid, service, digest):
+    def claim(self, rid, service, digest, allowed_subjects=None):
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             row = self.owned(db, rid, "service", service)
+            if allowed_subjects is not None and row["subject"] not in allowed_subjects:
+                raise HTTPException(403, "Recipient is not allowed")
             if row["digest"] != digest:
                 raise HTTPException(409, "Execution payload differs from approved action")
             if row["status"] != "approved" or row["expires"] <= time.time():
@@ -226,7 +229,8 @@ class Store:
 
     def events(self, rid, subject, service, device_id):
         with self.connection() as db:
-            self.active_device(db, device_id)
+            db.execute("BEGIN IMMEDIATE")
+            self.recipient_device(db, device_id, subject, service)
             if self.owned(db, rid, "subject", subject)["service"] != service:
                 raise HTTPException(404, "Request not found")
             return [
@@ -242,4 +246,10 @@ class Store:
         ).fetchone()
         if not row:
             raise HTTPException(401, "Device is not paired")
+        return row
+
+    def recipient_device(self, db, device_id, subject, service):
+        row = self.active_device(db, device_id)
+        if row["subject"] != subject or row["service"] != service:
+            raise HTTPException(401, "Device is not paired for this recipient")
         return row

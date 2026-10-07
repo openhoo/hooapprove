@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["image", "publicUrl", "host"],
+  "properties": {
+    "image": {
+      "type": "string",
+      "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$",
+      "description": "Published container image pinned to an immutable SHA-256 digest."
+    },
+    "publicUrl": {
+      "type": "string",
+      "pattern": "^https://[^/?#@\\s]+/?$"
+    },
+    "host": {"type": "string", "minLength": 1}
+  }
+}
