@@ -117,3 +117,45 @@ sie ersetzt keinen Nachweis einer veröffentlichten APK oder eines ausgerollten 
 - Für die verbleibenden `braces`-/`node-forge`-Befunde existiert im abgefragten Registry-Stand keine
   korrigierte veröffentlichte Blattversion. Die korrigierte Decoder-Version ist ESM-only und passt
   nicht zum CommonJS-Consumer `query-string` im aktuellen Router; kein blindes Major-Override.
+
+## Veröffentlichung und Produktionsrollout · Preview 5 · 7. Oktober 2026
+
+- Quell-PR #10 gemergt zu `4cee7917d89daa0421a484a4eb18a7420f4b7418`.
+  Exakte Main-Checks `37590346928` und CodeQL `37590346500` erfolgreich vor dem signierten Tag
+  `v0.1.0-preview.5`. Release-Workflow `37590499590` erfolgreich: verify, image, Android und publish.
+  Nicht als Entwurf veröffentlichte Vorschau mit fünf Assets am 7. Oktober 2026 um 10:09:22 Uhr MESZ.
+- Publiziertes AMD64-/ARM64-Image:
+  `ghcr.io/openhoo/hooapprove@sha256:11c91b713f64e6a3f2385e21cbe9c6adeb7b43a6e98622d2f9e742ca9bb42bbf`.
+  Beide OCI-Konfigurationen binden diese Quellrevision und Preview-Version.
+- GitOps-PR #243 nach erfolgreicher Validierung gemergt zu
+  `22c328c98df3b2070e94b48ce3ae56a2295237ad`. Argo `hooapprove`: Synced/Healthy auf dieser Revision.
+  Neuer Pod `hooapprove-5b77c4dc65-rcqrn` bereit; gewünschtes Image und tatsächliche `imageID`
+  entsprechen dem publizierten Index-Digest. Beide ExternalSecrets melden Ready.
+- Frische Jobs `preview5-before-backup` und `preview5-after-backup` erfolgreich:
+  SQLite-Backup und isolierter Restore bestätigt. Die Produktionsdatenbank bleibt integer
+  (`quick_check=ok`), mit einer abgeschlossenen und einer abgelehnten Anfrage sowie null aktiven
+  Gerätekopplungen. Keine Empfänger- oder Aktionsdetails wurden ausgegeben.
+- Tatsächlicher öffentlicher HTTPS-Dienst: `/healthz` meldet `production`; private Testwerte werden
+  bei HTTP 422 nicht reflektiert, degenerierte Ed25519-Nachweise und übergroße Zeitstempel erhalten
+  HTTP 401. `no-store` und HSTS gesetzt; die überarbeitete Landingpage ist live.
+- Innerhalb des tatsächlich ausgerollten Images eine isolierte temporäre Testdatenbank genutzt:
+  gültiger Schlüssel akzeptiert, gefälschter Schlüssel abgewiesen, Executor kann nicht entscheiden,
+  Claim vor Entscheidung blockiert, signierte Kopplung/Inbox/Entscheidung bestätigt, Claim einmalig,
+  synthetischer Abschluss gespeichert und widerrufenes Gerät gesperrt. Null externe Wirkungen;
+  die Produktionsdatenbank und ihre Kopplungen wurden hierfür nicht verändert.
+- Tatsächlich veröffentlichte ARM64-APK und alle Begleitassets heruntergeladen:
+  alle vier `SHA256SUMS`-Einträge und alle fünf GitHub-Asset-Digests mit den Bytes abgeglichen.
+  `SOURCE.txt` entspricht dem getesteten Quellcommit, `IMAGE.txt` dem ausgerollten Index-Digest.
+- APK-Größe 50.959.890 Bytes; SHA-256
+  `ff3115c7e4f632c6a29b18e26be31395d371af8ad68389616487ad258ab28f91`.
+  APK-v2-Signatur gültig; Zertifikat-SHA-256
+  `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`
+  stimmt mit Preview 4 überein.
+- Aktualisierung auf Android-15-ARM64-Emulator `emulator-5580` mit `adb install -r` erfolgreich,
+  ohne Deinstallation. Exakte Aktivität `ai.openhoo.hooapprove/.MainActivity` kalt gestartet und
+  als Vordergrundaktivität bestätigt. Tatsächlicher veröffentlichter Start visuell geprüft:
+  HooApprove, Dienst verbinden, Kopplungshinweise und Verbinden; keine Fehler-/Ladeüberlagerung.
+  Screenshot `output/release-preview5/start.png`; strukturierter Nachweis
+  `output/release-preview5/verification.json`.
+- Diese Veröffentlichung ist weiterhin eine debug-signierte Android-ARM64-Vorschau.
+  Keine neue echte Produktionskopplung, Bestellung, Push- oder Biometrieabnahme; kein Store-/TestFlight-Release.

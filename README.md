@@ -6,7 +6,7 @@ Generischer Freigabedienst mit nativer Android-/iOS-App. **Kein Benutzerkonto,
 keine Anmeldung, kein Auth-Dienst.** Du koppelst dein Handy einmal per QR-Code,
 wie einen Authenticator. Danach prüfst du die Anfragen und schiebst zur Freigabe.
 
-[Android-Vorschauen](https://github.com/openhoo/hooapprove/releases/tag/v0.1.0-preview.4) ·
+[Android-Vorschauen](https://github.com/openhoo/hooapprove/releases/tag/v0.1.0-preview.5) ·
 [Gehosteter Dienst](https://approve.openhoo.dev)
 
 Preview 1/2 enthalten den verworfenen Login-Ablauf. Die Kopplungsversion ersetzt diesen Ablauf.
