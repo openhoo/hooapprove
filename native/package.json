@@ -40,7 +40,13 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "check": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "node --test tests/*.test.cjs"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "xcode": {
+      "uuid": "11.1.1"
+    }
+  }
 }

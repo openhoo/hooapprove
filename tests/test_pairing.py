@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
 from conftest import enrollment, proof
 from fastapi.testclient import TestClient
 from test_service import OTHER, approve, body, create, service_headers
@@ -145,6 +146,14 @@ def test_wrong_key_and_concurrent_replay(client):
     assert codes.count(401) == 7
 
 
+@pytest.mark.parametrize("timestamp", ["1" * 400, "-" + "1" * 400, "1" * 4301])
+def test_oversized_timestamp_is_rejected_without_server_error(client, timestamp):
+    response = raw(client).get(
+        "/api/me", headers={"X-Device-Time": timestamp, "X-Device-Nonce": "a" * 32}
+    )
+    assert response.status_code == 401
+
+
 def test_migration_removes_login_capabilities_preserves_decisions(client):
     from hooapprove.store import Store
 
@@ -180,3 +189,96 @@ def test_revocation_rechecked_inside_decision_transaction(client):
         )
     assert failure.value.status_code == 401
     assert client.app.state.store.get(value["id"], "rewe")["status"] == "pending"
+
+
+@pytest.mark.parametrize(
+    "public_key",
+    [
+        bytes(32),
+        b"\x01" + bytes(31),
+        bytes.fromhex("26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05"),
+        bytes.fromhex("c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a"),
+        (2**255 - 20).to_bytes(32, "little"),
+        (2**255 - 19).to_bytes(32, "little"),
+        (2**255 - 18).to_bytes(32, "little"),
+        b"\x01" + bytes(30) + b"\x80",
+    ],
+)
+def test_unsafe_public_keys_cannot_enroll(client, public_key):
+    t = ticket(client)
+    b, _ = enrollment(t)
+    b.update(public_key=public_key.hex(), signature=(b"\x01" + bytes(63)).hex())
+    assert raw(client).post("/api/pairings/enroll", json=b).status_code == 401
+    # Failed key validation must not consume the bootstrap ticket.
+    valid, _ = enrollment(t)
+    assert raw(client).post("/api/pairings/enroll", json=valid).status_code == 201
+
+
+def test_previously_paired_identity_key_cannot_forge_decisions(client):
+    value = create(client)
+    with client.app.state.store.connection() as db:
+        db.execute(
+            "UPDATE paired_devices SET public_key=? WHERE id=?",
+            ((b"\x01" + bytes(31)).hex(), client.device_id),
+        )
+    # This constant signature verifies for any message with this unsafe public
+    # key in some OpenSSL versions. Recheck the key on every proof, not only enroll.
+    path = f"/api/requests/{value['id']}/decision"
+    h = proof(client.device_key, client.device_id, "POST", path)
+    h["X-Device-Signature"] = (b"\x01" + bytes(63)).hex()
+    assert (
+        raw(client)
+        .post(path, headers=h, json={"decision": "approve", "digest": value["digest"]})
+        .status_code
+        == 401
+    )
+    assert client.app.state.store.get(value["id"], "rewe")["status"] == "pending"
+
+
+def test_mixed_order_key_rejected_even_with_older_libsodium(monkeypatch):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from fastapi import HTTPException
+    from nacl.bindings import crypto_core_ed25519_add
+
+    from hooapprove import devices
+
+    key = Ed25519PrivateKey.generate()
+    mixed = crypto_core_ed25519_add(key.public_key().public_bytes_raw(), bytes(32))
+    # Simulate libsodium <=1.0.20's permissive initial membership check.
+    monkeypatch.setattr(devices, "crypto_core_ed25519_is_valid_point", lambda _: True)
+
+    class PermissiveVerifier:
+        @classmethod
+        def from_public_bytes(cls, _):
+            pytest.fail("A mixed-order key reached signature verification")
+
+    monkeypatch.setattr(devices, "Ed25519PublicKey", PermissiveVerifier)
+    with pytest.raises(HTTPException) as failure:
+        devices.verify(mixed.hex(), key.sign(b"message").hex(), b"message")
+    assert failure.value.status_code == 401
+
+
+@pytest.mark.parametrize("operation", ["list", "decide", "events"])
+@pytest.mark.parametrize("subject,service", [("other-human", "rewe"), ("demo-human", "mail")])
+def test_store_enforces_device_recipient_and_service(client, operation, subject, service):
+    from fastapi import HTTPException
+
+    from hooapprove.models import Decision
+
+    value = create(client)
+    store = client.app.state.store
+    with pytest.raises(HTTPException) as failure:
+        if operation == "list":
+            store.list_for(subject, service, client.device_id)
+        elif operation == "decide":
+            store.decide(
+                value["id"],
+                subject,
+                Decision(decision="approve", digest=value["digest"]),
+                service,
+                client.device_id,
+            )
+        else:
+            store.events(value["id"], subject, service, client.device_id)
+    assert failure.value.status_code == 401
+    assert store.get(value["id"], "rewe")["status"] == "pending"

@@ -1,7 +1,8 @@
 self.addEventListener('push', event => {
-  const message = event.data?.json() || {};
-  event.waitUntil(self.registration.showNotification(message.title || 'HooApprove', {
-    body: message.body || 'Eine Aktion wartet auf deine Entscheidung.',
+  // Older installations may still have this worker. Lock-screen text is always generic,
+  // regardless of the push payload; private action details belong in the native inbox.
+  event.waitUntil(self.registration.showNotification('HooApprove', {
+    body: 'Eine Aktion wartet auf deine Entscheidung.',
     icon: '/static/icon.svg', tag: 'hooapprove-pending',
   }));
 });

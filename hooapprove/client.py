@@ -5,6 +5,22 @@ import httpx
 from .models import ActionRequest, action_digest
 
 
+class ExecutionResultReportingError(RuntimeError):
+    """The operation succeeded, but its completion could not be recorded.
+
+    Reconcile using the reference and execution identity; never repeat the operation.
+    """
+
+    def __init__(self, request_id, execution_id, reference):
+        super().__init__(
+            "Operation completed, but HooApprove could not record its result. "
+            "Do not repeat the operation; reconcile its execution result."
+        )
+        self.request_id = request_id
+        self.execution_id = execution_id
+        self.reference = reference
+
+
 class ApprovalClient:
     def __init__(self, url, token, service, *, http=None):
         self.http = http or httpx.Client(base_url=url, timeout=15)
@@ -39,10 +55,15 @@ class ApprovalClient:
             # Even an apparent timeout can mean the external service already placed the order.
             try:
                 self.report(request_id, receipt["execution_id"], "uncertain")
-            except httpx.HTTPError:
+            except Exception:
                 pass  # Remains 'executing': also fenced against another execution.
             raise
-        self.report(request_id, receipt["execution_id"], "completed", str(reference))
+        try:
+            self.report(request_id, receipt["execution_id"], "completed", str(reference))
+        except Exception as error:
+            raise ExecutionResultReportingError(
+                request_id, receipt["execution_id"], reference
+            ) from error
         return reference
 
     def report(self, request_id, execution_id, outcome, reference=""):

@@ -3,14 +3,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import Field
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .body_limit import BodyLimitMiddleware
 from .config import Settings
 from .devices import Enrollment, PairingRequest, Ticket, enroll, issue, paired_device, preview
+from .host_limit import OriginHostMiddleware
 from .models import ActionRequest, Claim, Decision, Result, StrictModel
 from .push import notify
 from .store import Store
@@ -31,16 +32,20 @@ def create_app(settings=None):
     )
     app.state.store = store
     app.state.settings = settings
-    app.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=[urlparse(settings.public_url).hostname]
-    )
+    app.add_middleware(OriginHostMiddleware, hostname=urlparse(settings.public_url).hostname)
     app.add_middleware(BodyLimitMiddleware)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request, exc):
+        # Default validation responses echo private tickets, proofs and action payloads.
+        # Locations may also contain attacker-controlled JSON keys, so omit them too.
+        return JSONResponse({"detail": "Invalid request"}, status_code=422)
 
     @app.middleware("http")
     async def security_headers(request, call_next):
-        if settings.demo and request.client.host not in {"127.0.0.1", "::1", "testclient"}:
-            from fastapi.responses import JSONResponse
-
+        if settings.demo and (
+            request.client is None or request.client.host not in {"127.0.0.1", "::1", "testclient"}
+        ):
             return JSONResponse({"detail": "Demo is loopback-only"}, status_code=403)
         response = await call_next(request)
         response.headers.update(
@@ -131,6 +136,7 @@ def create_app(settings=None):
     @app.post("/api/native-devices")
     def native_device(body: Device, identity=Depends(paired_device)):
         with store.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
             store.active_device(db, identity["id"])
             db.execute(
                 "UPDATE paired_devices SET push_token=? WHERE id=? AND revoked=0",
@@ -153,7 +159,7 @@ def create_app(settings=None):
 
     @app.post("/v1/requests/{rid}/claim")
     def claim(rid: str, body: Claim, name=Depends(service)):
-        return store.claim(rid, name, body.digest)
+        return store.claim(rid, name, body.digest, settings.services[name]["subjects"])
 
     @app.post("/v1/requests/{rid}/result")
     def result(rid: str, body: Result, name=Depends(service)):

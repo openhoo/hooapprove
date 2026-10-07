@@ -4,8 +4,10 @@ The authenticated MCP session resolves subject; never accept an arbitrary subjec
 Keep checkout credentials behind this adapter. No agent-accessible unguarded checkout endpoint.
 """
 
+import hashlib
+
 from hooapprove.client import ApprovalClient
-from hooapprove.models import ActionRequest
+from hooapprove.models import ActionRequest, action_digest
 
 
 class GuardedCheckout:
@@ -28,7 +30,7 @@ class GuardedCheckout:
                 "payment_method_id",
             )
         }
-        return ActionRequest(
+        action = ActionRequest(
             subject=subject,
             action="order.place",
             title="Deinen Einkauf bestellen",
@@ -47,13 +49,34 @@ class GuardedCheckout:
                 {"label": "Zahlung", "value": order["payment_label"]},
             ],
             payload=payload,
-            idempotency_key=f"order-{order['cart_id']}-v{order['cart_version']}",
+            idempotency_key="checkout-snapshot",
+            expires_in=300,
         )
+        # Prices, address or payment labels can change without a new cart revision.
+        # The whole approval envelope therefore identifies this preparation attempt.
+        action.idempotency_key = "order-" + action_digest(self.approvals.service, action)
+        return action
 
-    def prepare(self, authenticated_subject):
-        value = self.approvals.request(self.snapshot(authenticated_subject))
+    def prepare(self, authenticated_subject, *, attempt_id=None):
+        """Prepare once per trusted workflow attempt, with stable IDs across retries.
+
+        After rejection, cancellation or expiry, a deliberate new preparation can use
+        a fresh attempt_id. An uncertain/executing/completed order must be reconciled
+        upstream before starting another attempt; never generate retry IDs automatically.
+        """
+        action = self.snapshot(authenticated_subject)
+        if attempt_id is not None:
+            if not isinstance(attempt_id, str) or not 1 <= len(attempt_id) <= 200:
+                raise ValueError(
+                    "Preparation attempt ID must be a nonempty string of at most 200 characters"
+                )
+            action.idempotency_key = (
+                "order-"
+                + hashlib.sha256(f"{action.idempotency_key}\n{attempt_id}".encode()).hexdigest()
+            )
+        value = self.approvals.request(action)
         return {
-            "status": "approval_required",
+            "status": "approval_required" if value["status"] == "pending" else value["status"],
             "request_id": value["id"],
             "approval_url": value["approval_url"],
         }

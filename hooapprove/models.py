@@ -2,11 +2,18 @@ import hashlib
 import json
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def valid_unicode(self):
+        # JSON permits escaped lone surrogates, but they have no UTF-8 encoding.
+        # Reject these during validation, before hashing, SQLite or UI rendering.
+        canonical(self.model_dump()).encode("utf-8")
+        return self
 
 
 class Detail(StrictModel):

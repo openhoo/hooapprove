@@ -1,16 +1,26 @@
+import { fetch } from 'expo/fetch';
+import { serverOrigin } from './serverUrl';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 
-export const SERVER_URL = (process.env.EXPO_PUBLIC_HOOAPPROVE_URL || 'https://approve.openhoo.dev').replace(/\/$/, '');
+export const SERVER_URL = serverOrigin(process.env.EXPO_PUBLIC_HOOAPPROVE_URL || 'https://approve.openhoo.dev');
 export type Connection = { device_id: string; seed: string; service: string; label: string; pending?: boolean };
 const storageKey = 'hooapprove.connections.v1';
 export async function getConnections(): Promise<Connection[]> {
   const ids: string[] = JSON.parse(await SecureStore.getItemAsync(storageKey) || '[]');
   const values = await Promise.all(ids.map(id => SecureStore.getItemAsync('hooapprove.device.' + id)));
   return values.filter((value): value is string => value !== null).map(value => JSON.parse(value));
+}
+// Serialize read-modify-write operations so pairing, reconciliation and unlinking
+// never resurrect removed keys or overwrite a concurrently paired device.
+let storageQueue: Promise<void> = Promise.resolve();
+function updateConnections(update: (values: Connection[]) => Connection[]): Promise<void> {
+  const operation = storageQueue.then(async () => saveConnections(update(await getConnections())));
+  storageQueue = operation.catch(() => {});
+  return operation;
 }
 async function saveConnections(values: Connection[]) {
   const previous: string[] = JSON.parse(await SecureStore.getItemAsync(storageKey) || '[]');
@@ -34,12 +44,15 @@ async function request(path: string, body?: unknown, connection?: Connection, me
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch(SERVER_URL + path, { method: verb, headers, body: body === undefined ? undefined : raw, signal: controller.signal });
-    if (response.status === 401) throw new Error('device_unavailable');
+    const response = await fetch(SERVER_URL + path, { method: verb, headers, body: body === undefined ? undefined : raw, signal: controller.signal, redirect: 'error', credentials: 'omit' });
+    if (response.status === 401) {
+      const failure = await response.json().catch(() => null);
+      throw new Error(failure?.detail === 'Device is not paired' ? 'device_not_paired' : 'device_unavailable');
+    }
     if (response.status === 409) throw new Error('conflict');
     if (response.status === 410) throw new Error('pairing_expired');
     if (!response.ok) throw new Error('request_failed');
-    return response.json();
+    return await response.json();
   } finally { clearTimeout(timeout); }
 }
 export async function api(path: string, body?: unknown, method = 'POST', deviceId?: string) {
@@ -68,8 +81,7 @@ export async function pair(value: string, preview: { service: string; label: str
   const public_key = bytesToHex(ed25519.getPublicKey(seed));
   const connection: Connection = { device_id, seed: bytesToHex(seed), ...preview, pending: true };
   // Persist BEFORE enrollment: an interrupted response must not lose the enrolled key.
-  const existing = await getConnections();
-  await saveConnections([...existing, connection]);
+  await updateConnections(existing => [...existing, connection]);
   const digest = bytesToHex(sha256(utf8ToBytes(ticket)));
   const message = `hooapprove.pair.v1\n${digest}\n${device_id}\n${public_key}`;
   try {
@@ -79,16 +91,36 @@ export async function pair(value: string, preview: { service: string; label: str
     try { await request('/api/me', undefined, connection); }
     catch { throw error; }
   }
-  await saveConnections([...existing, { ...connection, pending: false }]);
+  await updateConnections(existing => existing.map(c => c.device_id === device_id ? { ...c, pending: false } : c));
 }
 export async function reconcile(connection: Connection) {
   const me = await api('/api/me', undefined, 'GET', connection.device_id);
-  if (connection.pending) await saveConnections((await getConnections()).map(c => c.device_id === connection.device_id ? { ...c, pending: false } : c));
+  if (connection.pending) await updateConnections(existing => existing.map(c => c.device_id === connection.device_id ? { ...c, pending: false } : c));
   return me;
 }
 export async function unlink(deviceId: string) {
   await api('/api/device/unlink', {}, 'POST', deviceId);
-  await saveConnections((await getConnections()).filter(c => c.device_id !== deviceId));
+  await updateConnections(existing => existing.filter(c => c.device_id !== deviceId));
 }
 export async function demoTicket() { return request('/api/demo/pairing', {}); }
 export const LOCAL_DEMO = /^http:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(SERVER_URL);
+
+// Only a user-confirmed pending enrollment may be forgotten locally.
+export async function forgetPending(deviceId: string) {
+  const connection = (await getConnections()).find(c => c.device_id === deviceId);
+  if (!connection) return;
+  if (!connection.pending) throw new Error('connection_is_paired');
+  try {
+    await reconcile(connection);
+    throw new Error('connection_is_paired');
+  } catch (error) {
+    // Only an authoritative missing-device response permits local removal.
+    // Timeouts, stale proofs and revoked recipient grants preserve the key.
+    if ((error as Error).message !== 'device_not_paired') throw error;
+  }
+  await updateConnections(existing => {
+    const connection = existing.find(c => c.device_id === deviceId);
+    if (connection && !connection.pending) throw new Error('connection_is_paired');
+    return existing.filter(c => c.device_id !== deviceId);
+  });
+}

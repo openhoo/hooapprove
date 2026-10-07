@@ -42,3 +42,78 @@ Die frühere Veröffentlichung ist in `verification-login-preview.md` als histor
 - Keine echte REWE-Bestellung; der bestehende REWE-Dienst bleibt opt-in.
 - Keine Plattformattestierung oder serververifizierte Biometrie.
 - Native Build-Abhängigkeiten: 29 Auditmeldungen (10 moderate, 19 high) im aufgelösten SDK-57-Stand; kein erzwungenes inkompatibles Downgrade.
+
+## Breite Prüfung und Korrekturen · 7. Oktober 2026
+
+Vier Agenten prüften parallel Backend/Sicherheitsgrenze, Native-App, Executor/CLI/Web und
+HTTP-/Deployment-Konfiguration. Eine zweite unabhängige Prüfung über die Zuständigkeitsgrenzen
+ergänzte die ersten Befunde. Diese Abnahme beschreibt den neuen lokalen Quellstand;
+sie ersetzt keinen Nachweis einer veröffentlichten APK oder eines ausgerollten Produktionsimages.
+
+### Behobene Sicherheits- und Zustandsfehler
+
+- Ein degenerierter Ed25519-Schlüssel konnte im ursprünglichen Verifier einen konstanten
+  Besitznachweis für beliebige Nachrichten bestehen. Enrollment und bestehende gespeicherte
+  Geräteschlüssel müssen jetzt die libsodium-Prüfungen einschließlich Primordnungs-Untergruppe bestehen.
+- Inbox, Entscheidung und Verlauf prüfen Gerät, Dienst und Empfänger innerhalb derselben
+  Store-Transaktion. Konkurrierende Entscheidungen sowie Claim/Stornierung sind gegenseitig ausgeschlossen.
+- Überlange Timestamp-Header werden mit HTTP 401 statt einem internen Fehler abgewiesen;
+  ungültige Unicode-Surrogate werden vor Digest-Berechnung und Persistierung zurückgewiesen.
+- HTTP-Validierungsfehler geben keine privaten Eingabewerte oder Feldnamen zurück. Chunked Bodies
+  ohne Content-Length sind begrenzt, und die für Signaturen verwendeten Body-Bytes bleiben unverändert.
+- Mehrdeutige Dienstkonfigurationen, doppelte Tokens und credential-/pfad-/queryhaltige Origins
+  verhindern den Start. Der Host-Abgleich unterstützt IPv6-Loopback und lehnt fremde Hosts ab.
+- Claims für aus der Konfiguration entfernte Empfänger sind gesperrt; bereits beanspruchte
+  Ergebnisse können weiterhin finalisiert werden. Pending-Anfragen werden vor terminalem Verlauf geladen.
+- Ergebnismeldungsfehler nach erfolgreicher externer Aktion sind als eigener Exception-Typ mit
+  Ausführungs-ID und Ergebnisreferenz erkennbar. Upstream-Fehler werden durch Meldungsfehler nicht verdeckt.
+- Das Beispiel-Checkout bindet frische Freigaben an den vollständigen Aktionsstand und unterstützt
+  ausdrücklich neue, vertrauenswürdig vergebene Workflow-Versuche. Es erzeugt keine automatischen Ersatzversuche.
+- QR-Dateien bleiben privat; die CLI lehnt Token-Echo ab und entfernt fehlgeschlagene Ausgaben,
+  ohne Secret-haltige Fehlertexte auszugeben. Legacy-Web-Push ignoriert übermittelte private Textfelder.
+
+### Native-App und Oberfläche
+
+- Konkurrierende SecureStore-Änderungen erhalten beide Geräteschlüssel; späte Enrollment-Antworten
+  stellen bereits entfernte Verbindungen nicht wieder her.
+- Nur die aktuelle Inbox-Abfrage darf den sichtbaren Zustand ersetzen. Nicht erreichbare Verbindungen
+  behalten lesbare Details, lassen aber keine Entscheidung zu. Abgelaufene Karten sperren ihre Bedienelemente.
+- Der Schieberegler verlangt eine bewusste horizontale Einfinger-Geste. Live-Sperrzustand,
+  Gestenabbruch und die explizite Screenreader-Bestätigung verhindern veraltete Freigabeaufrufe.
+- Kopplungsvorschau und Verlauf erhalten Ablauf-, Lade- und Fehlerzustände. Biometrie ist beschriftet,
+  die untere Safe Area wird berücksichtigt, und lange Dienstnamen können umbrechen.
+- Der Netzwerk-Timeout umfasst auch das Lesen des Antwortbodys. Die native Transport-API weist
+  Redirects zurück; die App akzeptiert nur einen geprüften HTTPS- oder Loopback-Origin.
+- Lokale ausstehende Kopplungen können nur nach ausdrücklicher Bestätigung und erneuter
+  eindeutiger Serverprüfung entfernt werden; ein Timeout verwirft keinen Schlüssel.
+- Landingpage: semantische Schritte, Sprunglink, Tastaturfokus, Kontrast, Touch-Ziele und
+  schmale Layouts. Chromium-Prüfung bei 1440, 390 und 320 Pixeln ohne horizontales Überlaufen;
+  der Sprunglink fokussiert den Hauptinhalt. Screenshots: `output/review/landing-*.png`.
+
+### Verifikation
+
+- Python: **111 bestandene Tests** für Service, Pairing, Adapter, CLI und HTTP-Grenzen;
+  Ruff-Prüfung und Formatprüfung bestanden. Eine bestehende Starlette/TestClient-Deprecation-Warnung bleibt.
+- Native: TypeScript, Lint, **7 bestandene Sicherheits-/Nebenläufigkeitstests** sowie
+  Android-/iOS-Hermes-Bundles. Eine temporäre iOS-Prebuild-Kopie ohne Installation bestand ebenfalls.
+- Aktuelle `ApprovalCard`-/`Pairing`-Quellkomponenten über eine isolierte React-Native-Web-Fixture
+  bei 390 und 320 Pixeln geprüft: pending, expired, busy, uncertain und Pairing ohne Überlaufen;
+  gültige horizontale Freigabegeste akzeptiert, kurze/vertikale Gesten gesperrt, Vorschau/Abbruch geprüft.
+  Native-only APIs sind in dieser Fixture gemockt. Screenshots: `output/review/native-*.png`.
+- Helm: Digest-Pinning, HTTPS-Origins, eine Replik und Recreate-Strategie geprüft. Der Chart lehnt
+  mutable Tags ab; die neue Chartprüfung und nativen Regressionstests laufen auch im PR-Gate.
+- Tatsächlicher lokaler HTTP-Dienst + tatsächlicher Shooping-Adapter, synthetischer REWE-Upstream:
+  vor Freigabe blockiert, danach genau eine gespeicherte Bestellung, `completed` gespeichert, Replay gesperrt.
+- Reale Handygesten, Kamera, Biometrie, Push, iOS-Verteilung und echte REWE-Bestellungen wurden
+  durch diese Prüfung nicht neu abgenommen.
+
+### Native Abhängigkeiten
+
+- `@expo/metro-file-map` innerhalb des bestehenden Versionsbereichs auf 57.0.4 aktualisiert.
+- Der auf `xcode` begrenzte `uuid`-Override auf 11.1.1 ersetzt eine verwundbare transitive Version.
+  Die verwendete CommonJS-API `uuid.v4()` wurde im tatsächlichen Xcode-Modul geprüft.
+- Der aktuelle Auditstand sinkt von **29 auf 21 Meldungen**: 3 moderate, 18 high, keine critical.
+  Expo 57 und React Native 0.86 bleiben erhalten. Ein erfolgreicher Bundle-Check ist kein sauberer Audit.
+- Für die verbleibenden `braces`-/`node-forge`-Befunde existiert im abgefragten Registry-Stand keine
+  korrigierte veröffentlichte Blattversion. Die korrigierte Decoder-Version ist ESM-only und passt
+  nicht zum CommonJS-Consumer `query-string` im aktuellen Router; kein blindes Major-Override.
